@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Leitor Q&A</title>
     <style>
         * {
@@ -10,9 +10,6 @@
             margin: 0;
             padding: 0;
             -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            user-select: none;
         }
 
         body {
@@ -24,7 +21,6 @@
             flex-direction: column;
             height: 100vh;
             overflow: hidden;
-            touch-action: manipulation;
         }
 
         header {
@@ -83,6 +79,7 @@
             position: relative;
         }
 
+        /* Zonas clicáveis para navegação (NOVO) */
         .nav-zone {
             position: absolute;
             top: 0;
@@ -339,6 +336,7 @@
     <div id="content">
         <div id="card">
             <div id="card-content">
+                <!-- Zonas clicáveis para navegação (NOVO) -->
                 <div class="nav-zone" id="prev-zone"></div>
                 <div class="nav-zone" id="next-zone"></div>
                 
@@ -422,8 +420,8 @@
             const currentFontSizeEl = document.getElementById('current-font-size');
             const fileInput = document.getElementById('file-input');
             const fileExport = document.getElementById('file-export');
-            const prevZone = document.getElementById('prev-zone');
-            const nextZone = document.getElementById('next-zone');
+            const prevZone = document.getElementById('prev-zone'); // NOVO
+            const nextZone = document.getElementById('next-zone'); // NOVO
 
             // Variáveis de estado
             let items = [];
@@ -431,51 +429,41 @@
             let currentIndex = 0;
             let isQAMode = true;
             let baseFontSize = 20;
-            let isScrolling = false;
+            let isScrolling = false; // NOVO: Para evitar conflitos entre rolagem e navegação
 
             // Inicialização
             loadSampleData();
             updateDisplay();
             updateFontSize();
 
-            // Fix para touch no WebView do Android
-            document.addEventListener('touchstart', function(e) {
-                e.preventDefault();
-                const touch = e.touches[0];
-                const clickEvent = new MouseEvent('click', {
-                    clientX: touch.clientX,
-                    clientY: touch.clientY
-                });
-                touch.target.dispatchEvent(clickEvent);
-            }, { passive: false });
-
-            // Event Listeners modificados para touch
-            menuBtn.addEventListener('touchstart', toggleMenu);
-            overlay.addEventListener('touchstart', toggleMenu);
-            saveEditBtn.addEventListener('touchstart', saveContent);
-            cancelEditBtn.addEventListener('touchstart', closeEditModal);
-            importFileBtn.addEventListener('touchstart', () => fileInput.click());
-            exportFileBtn.addEventListener('touchstart', exportFile);
-            editContentBtn.addEventListener('touchstart', openEditModal);
-            shuffleBtn.addEventListener('touchstart', shuffleItems);
-            resetOrderBtn.addEventListener('touchstart', resetOrder);
-            jumpToBtn.addEventListener('touchstart', jumpToQuestion);
-            increaseFontBtn.addEventListener('touchstart', increaseFontSize);
-            decreaseFontBtn.addEventListener('touchstart', decreaseFontSize);
+            // Event Listeners
+            menuBtn.addEventListener('click', toggleMenu);
+            overlay.addEventListener('click', toggleMenu);
+            saveEditBtn.addEventListener('click', saveContent);
+            cancelEditBtn.addEventListener('click', closeEditModal);
+            importFileBtn.addEventListener('click', () => fileInput.click());
+            exportFileBtn.addEventListener('click', exportFile);
+            editContentBtn.addEventListener('click', openEditModal);
+            shuffleBtn.addEventListener('click', shuffleItems);
+            resetOrderBtn.addEventListener('click', resetOrder);
+            jumpToBtn.addEventListener('click', jumpToQuestion);
+            increaseFontBtn.addEventListener('click', increaseFontSize);
+            decreaseFontBtn.addEventListener('click', decreaseFontSize);
             fileInput.addEventListener('change', handleFileImport);
             
-            // Navegação por zonas de toque
-            prevZone.addEventListener('touchstart', prevItem);
-            nextZone.addEventListener('touchstart', nextItem);
+            // NOVO: Navegação por clique nas extremidades
+            prevZone.addEventListener('click', prevItem);
+            nextZone.addEventListener('click', nextItem);
             
-            // Mostrar/ocultar resposta
-            cardContent.addEventListener('touchstart', function(e) {
+            // Clique no conteúdo para mostrar/ocultar resposta (modificado)
+            cardContent.addEventListener('click', function(e) {
+                // Só mostra resposta se o clique não foi nas zonas de navegação
                 if (!e.target.classList.contains('nav-zone') && isQAMode) {
                     answerEl.classList.toggle('visible');
                 }
             });
 
-            // Gesto de swipe
+            // Gesto de swipe (MANTIDO ORIGINAL)
             let touchStartX = 0;
             let touchEndX = 0;
 
@@ -488,13 +476,13 @@
                 handleSwipe();
             }, false);
 
-            // Detectar rolagem
+            // NOVO: Detectar rolagem para evitar conflitos
             cardContent.addEventListener('scroll', () => {
                 isScrolling = true;
                 setTimeout(() => { isScrolling = false; }, 100);
             });
 
-            // Prevenir comportamento padrão de swipe para baixo
+            // Prevenir comportamento padrão de swipe para baixo (MANTIDO)
             let touchStartY = 0;
             
             window.addEventListener('touchstart', (e) => {
@@ -507,7 +495,7 @@
                 }
             }, { passive: false });
 
-            // Teclado navegação
+            // Teclado navegação (MANTIDO)
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'ArrowLeft') {
                     prevItem();
@@ -524,7 +512,7 @@
                 }
             });
 
-            // Funções (mantidas originais)
+            // Funções (MANTIDAS com pequenos ajustes)
             function toggleMenu() {
                 menu.classList.toggle('active');
                 overlay.classList.toggle('active');
@@ -630,21 +618,22 @@
             }
 
             function nextItem() {
-                if (items.length === 0 || isScrolling) return;
+                if (items.length === 0 || isScrolling) return; // NOVO: Verifica se está rolando
                 currentIndex = (currentIndex + 1) % items.length;
                 updateDisplay();
                 saveState();
             }
 
             function prevItem() {
-                if (items.length === 0 || isScrolling) return;
+                if (items.length === 0 || isScrolling) return; // NOVO: Verifica se está rolando
                 currentIndex = (currentIndex - 1 + items.length) % items.length;
                 updateDisplay();
                 saveState();
             }
 
+            // MANTIDO ORIGINAL (swipe)
             function handleSwipe() {
-                if (isScrolling) return;
+                if (isScrolling) return; // NOVO: Ignora se estiver rolando
                 
                 const threshold = 50;
                 if (touchEndX < touchStartX - threshold) {
