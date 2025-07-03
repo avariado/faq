@@ -55,14 +55,21 @@
             position: relative;
         }
 
+        .card-container {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            max-width: 900px;
+            position: relative;
+        }
+
         #card {
             width: 100%;
-            max-width: 800px;
             background: white;
             border-radius: 10px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             padding: 30px;
-            margin: 20px;
+            margin: 0 10px;
             min-height: 300px;
             max-height: 70vh;
             display: flex;
@@ -96,15 +103,12 @@
             right: 0;
         }
 
-        /* Botões de navegação */
+        /* Botões de navegação - FORA DA CAIXA */
         .nav-button {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
             width: 50px;
             height: 50px;
             border-radius: 50%;
-            background-color: rgba(98, 0, 238, 0.7);
+            background-color: #6200ee;
             color: white;
             border: none;
             font-size: 24px;
@@ -115,19 +119,20 @@
             z-index: 10;
             transition: all 0.2s;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            flex-shrink: 0;
         }
 
         .nav-button:hover {
-            background-color: rgba(98, 0, 238, 0.9);
-            transform: translateY(-50%) scale(1.1);
+            background-color: #7c29ff;
+            transform: scale(1.1);
         }
 
         #prev-button {
-            left: 10px;
+            margin-right: 10px;
         }
 
         #next-button {
-            right: 10px;
+            margin-left: 10px;
         }
 
         #question {
@@ -363,6 +368,9 @@
                 height: 40px;
                 font-size: 20px;
             }
+            .card-container {
+                padding: 0 5px;
+            }
         }
     </style>
 </head>
@@ -373,23 +381,27 @@
     </header>
 
     <div id="content">
-        <div id="card">
-            <!-- Botões de navegação adicionados -->
-            <button id="prev-button" class="nav-button">←</button>
-            <button id="next-button" class="nav-button">→</button>
+        <div class="card-container">
+            <!-- Botões de navegação agora fora da caixa principal -->
+            <button id="prev-button" class="nav-button">◄</button>
             
-            <div id="card-content">
-                <!-- Zonas clicáveis para navegação (NOVO) -->
-                <div class="nav-zone" id="prev-zone"></div>
-                <div class="nav-zone" id="next-zone"></div>
-                
-                <div id="question"></div>
-                <div id="answer"></div>
+            <div id="card">
+                <div id="card-content">
+                    <!-- Zonas clicáveis para navegação (NOVO) -->
+                    <div class="nav-zone" id="prev-zone"></div>
+                    <div class="nav-zone" id="next-zone"></div>
+                    
+                    <div id="question"></div>
+                    <div id="answer"></div>
+                </div>
+                <div id="counter">0 / 0</div>
             </div>
-            <div id="counter">0 / 0</div>
+            
+            <button id="next-button" class="nav-button">►</button>
         </div>
     </div>
 
+    <!-- Restante do código permanece igual -->
     <div id="menu">
         <div class="menu-item" id="import-file">
             <i>📁</i> Importar Ficheiro
@@ -463,10 +475,10 @@
             const currentFontSizeEl = document.getElementById('current-font-size');
             const fileInput = document.getElementById('file-input');
             const fileExport = document.getElementById('file-export');
-            const prevZone = document.getElementById('prev-zone'); // NOVO
-            const nextZone = document.getElementById('next-zone'); // NOVO
-            const prevButton = document.getElementById('prev-button'); // NOVO: Botão anterior
-            const nextButton = document.getElementById('next-button'); // NOVO: Botão próximo
+            const prevZone = document.getElementById('prev-zone');
+            const nextZone = document.getElementById('next-zone');
+            const prevButton = document.getElementById('prev-button');
+            const nextButton = document.getElementById('next-button');
 
             // Variáveis de estado
             let items = [];
@@ -474,7 +486,7 @@
             let currentIndex = 0;
             let isQAMode = true;
             let baseFontSize = 20;
-            let isScrolling = false; // NOVO: Para evitar conflitos entre rolagem e navegação
+            let isScrolling = false;
 
             // Inicialização
             loadSampleData();
@@ -496,17 +508,12 @@
             decreaseFontBtn.addEventListener('click', decreaseFontSize);
             fileInput.addEventListener('change', handleFileImport);
             
-            // NOVO: Navegação por clique nas extremidades
             prevZone.addEventListener('click', prevItem);
             nextZone.addEventListener('click', nextItem);
-            
-            // NOVO: Navegação por botões
             prevButton.addEventListener('click', prevItem);
             nextButton.addEventListener('click', nextItem);
             
-            // Clique no conteúdo para mostrar/ocultar resposta (modificado)
             cardContent.addEventListener('click', function(e) {
-                // Só mostra resposta se o clique não foi nas zonas de navegação ou botões
                 if (!e.target.classList.contains('nav-zone') && 
                     !e.target.classList.contains('nav-button') && 
                     isQAMode) {
@@ -514,7 +521,9 @@
                 }
             });
 
-            // Gesto de swipe (MANTIDO ORIGINAL)
+            // Restante do JavaScript permanece igual
+            // ... (o mesmo código JavaScript da versão anterior)
+            
             let touchStartX = 0;
             let touchEndX = 0;
 
@@ -527,13 +536,11 @@
                 handleSwipe();
             }, false);
 
-            // NOVO: Detectar rolagem para evitar conflitos
             cardContent.addEventListener('scroll', () => {
                 isScrolling = true;
                 setTimeout(() => { isScrolling = false; }, 100);
             });
 
-            // Prevenir comportamento padrão de swipe para baixo (MANTIDO)
             let touchStartY = 0;
             
             window.addEventListener('touchstart', (e) => {
@@ -546,7 +553,6 @@
                 }
             }, { passive: false });
 
-            // Teclado navegação (MANTIDO)
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'ArrowLeft') {
                     prevItem();
@@ -563,7 +569,6 @@
                 }
             });
 
-            // Funções (MANTIDAS com pequenos ajustes)
             function toggleMenu() {
                 menu.classList.toggle('active');
                 overlay.classList.toggle('active');
@@ -669,22 +674,21 @@
             }
 
             function nextItem() {
-                if (items.length === 0 || isScrolling) return; // NOVO: Verifica se está rolando
+                if (items.length === 0 || isScrolling) return;
                 currentIndex = (currentIndex + 1) % items.length;
                 updateDisplay();
                 saveState();
             }
 
             function prevItem() {
-                if (items.length === 0 || isScrolling) return; // NOVO: Verifica se está rolando
+                if (items.length === 0 || isScrolling) return;
                 currentIndex = (currentIndex - 1 + items.length) % items.length;
                 updateDisplay();
                 saveState();
             }
 
-            // MANTIDO ORIGINAL (swipe)
             function handleSwipe() {
-                if (isScrolling) return; // NOVO: Ignora se estiver rolando
+                if (isScrolling) return;
                 
                 const threshold = 50;
                 if (touchEndX < touchStartX - threshold) {
