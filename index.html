@@ -81,7 +81,6 @@
             -webkit-overflow-scrolling: touch;
         }
 
-        /* Container para os botões e contador */
         .card-footer {
             display: flex;
             align-items: center;
@@ -89,7 +88,6 @@
             margin-top: 15px;
         }
 
-        /* Botões de navegação */
         .nav-button {
             width: 36px;
             height: 36px;
@@ -167,7 +165,6 @@
             background: #a0a0a0;
         }
 
-        /* Restante do CSS permanece igual */
         #menu {
             position: fixed;
             top: 0;
@@ -372,7 +369,6 @@
         </div>
     </div>
 
-    <!-- Restante do HTML permanece igual -->
     <div id="menu">
         <div class="menu-item" id="import-file">
             <i>📁</i> Importar Ficheiro
@@ -456,7 +452,7 @@
             let baseFontSize = 20;
             let touchStartX = 0;
             let touchStartY = 0;
-            let isSwiping = false;
+            let isHorizontalSwipe = false;
 
             // Inicialização
             loadSampleData();
@@ -500,30 +496,34 @@
             cardContent.addEventListener('touchstart', function(e) {
                 touchStartX = e.touches[0].clientX;
                 touchStartY = e.touches[0].clientY;
-                isSwiping = false;
+                isHorizontalSwipe = false;
             }, { passive: true });
 
             cardContent.addEventListener('touchmove', function(e) {
+                if (isHorizontalSwipe) {
+                    e.preventDefault();
+                    return;
+                }
+
                 const touchX = e.touches[0].clientX;
                 const touchY = e.touches[0].clientY;
                 const diffX = Math.abs(touchX - touchStartX);
                 const diffY = Math.abs(touchY - touchStartY);
-                
-                // Se movimento for predominantemente horizontal, marca como swipe
+
+                // Determina se é um swipe horizontal
                 if (diffX > diffY && diffX > 10) {
-                    isSwiping = true;
+                    isHorizontalSwipe = true;
                     e.preventDefault();
                 }
-                // Movimento vertical (scroll) é permitido normalmente
+                // Swipe vertical é permitido normalmente
             }, { passive: false });
 
             cardContent.addEventListener('touchend', function(e) {
-                if (!isSwiping) return;
-                
+                if (!isHorizontalSwipe) return;
+
                 const touchEndX = e.changedTouches[0].clientX;
                 const diffX = touchEndX - touchStartX;
-                
-                // Limiar para considerar swipe
+
                 if (Math.abs(diffX) > 50) {
                     if (diffX > 0) {
                         prevItem();
@@ -531,17 +531,16 @@
                         nextItem();
                     }
                 }
-                isSwiping = false;
             }, { passive: true });
 
-            // Previne refresh da página com swipe para baixo
+            // Previne refresh da página apenas fora do card
             window.addEventListener('touchstart', function(e) {
-                if (e.target === cardContent) return;
+                if (e.target === card || e.target === cardContent) return;
                 touchStartY = e.touches[0].clientY;
             }, { passive: true });
 
             window.addEventListener('touchmove', function(e) {
-                if (e.target === cardContent) return;
+                if (e.target === card || e.target === cardContent) return;
                 if (window.scrollY === 0 && e.touches[0].clientY > touchStartY) {
                     e.preventDefault();
                 }
@@ -564,7 +563,6 @@
                 }
             });
 
-            // Restante das funções permanece igual
             function toggleMenu() {
                 menu.classList.toggle('active');
                 overlay.classList.toggle('active');
