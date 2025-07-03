@@ -452,7 +452,6 @@
             let baseFontSize = 20;
             let touchStartX = 0;
             let touchStartY = 0;
-            let isHorizontalSwipe = false;
 
             // Inicialização
             loadSampleData();
@@ -492,35 +491,27 @@
                 }
             });
 
-            // Controle de touch para swipe horizontal e scroll vertical
+            // Controle de touch - Versão Simplificada
             cardContent.addEventListener('touchstart', function(e) {
                 touchStartX = e.touches[0].clientX;
                 touchStartY = e.touches[0].clientY;
-                isHorizontalSwipe = false;
             }, { passive: true });
 
             cardContent.addEventListener('touchmove', function(e) {
-                if (isHorizontalSwipe) {
-                    e.preventDefault();
-                    return;
-                }
-
-                const touchX = e.touches[0].clientX;
+                // Permite todo movimento vertical (scroll)
                 const touchY = e.touches[0].clientY;
-                const diffX = Math.abs(touchX - touchStartX);
                 const diffY = Math.abs(touchY - touchStartY);
-
-                // Determina se é um swipe horizontal
+                
+                // Apenas previne o comportamento padrão para swipes horizontais
+                const touchX = e.touches[0].clientX;
+                const diffX = Math.abs(touchX - touchStartX);
+                
                 if (diffX > diffY && diffX > 10) {
-                    isHorizontalSwipe = true;
                     e.preventDefault();
                 }
-                // Swipe vertical é permitido normalmente
             }, { passive: false });
 
             cardContent.addEventListener('touchend', function(e) {
-                if (!isHorizontalSwipe) return;
-
                 const touchEndX = e.changedTouches[0].clientX;
                 const diffX = touchEndX - touchStartX;
 
@@ -533,14 +524,14 @@
                 }
             }, { passive: true });
 
-            // Previne refresh da página apenas fora do card
-            window.addEventListener('touchstart', function(e) {
-                if (e.target === card || e.target === cardContent) return;
+            // Prevenção de refresh apenas no body (fora do card)
+            document.body.addEventListener('touchstart', function(e) {
+                if (e.target.closest('#card')) return;
                 touchStartY = e.touches[0].clientY;
             }, { passive: true });
 
-            window.addEventListener('touchmove', function(e) {
-                if (e.target === card || e.target === cardContent) return;
+            document.body.addEventListener('touchmove', function(e) {
+                if (e.target.closest('#card')) return;
                 if (window.scrollY === 0 && e.touches[0].clientY > touchStartY) {
                     e.preventDefault();
                 }
