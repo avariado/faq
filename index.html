@@ -493,32 +493,49 @@
                 }
             });
 
-            // Gesto de swipe (mantido)
+            // Gesto de swipe horizontal (navegação)
             let touchStartX = 0;
             let touchEndX = 0;
+            let touchStartY = 0;
+            let touchEndY = 0;
 
             card.addEventListener('touchstart', (e) => {
                 touchStartX = e.changedTouches[0].screenX;
-            }, false);
+                touchStartY = e.changedTouches[0].screenY;
+            }, {passive: true});
+
+            card.addEventListener('touchmove', (e) => {
+                // Permite scroll vertical normal
+                touchEndY = e.changedTouches[0].screenY;
+                const verticalDiff = Math.abs(touchEndY - touchStartY);
+                
+                // Se for um movimento predominantemente vertical, permite o scroll
+                if (verticalDiff > 10) {
+                    return;
+                }
+                
+                // Para movimentos horizontais, previne o comportamento padrão
+                e.preventDefault();
+            }, {passive: false});
 
             card.addEventListener('touchend', (e) => {
                 touchEndX = e.changedTouches[0].screenX;
-                handleSwipe();
-            }, false);
+                touchEndY = e.changedTouches[0].screenY;
+                
+                // Verifica se foi um swipe horizontal (não vertical)
+                if (Math.abs(touchEndY - touchStartY) < 30) {
+                    handleSwipe();
+                }
+            }, {passive: true});
 
             cardContent.addEventListener('scroll', () => {
                 isScrolling = true;
                 setTimeout(() => { isScrolling = false; }, 100);
             });
 
-            // Prevenir comportamento padrão de swipe para baixo
-            let touchStartY = 0;
-            
-            window.addEventListener('touchstart', (e) => {
-                touchStartY = e.touches[0].clientY;
-            }, { passive: false });
-            
-            window.addEventListener('touchmove', (e) => {
+            // Previne o refresh da página com swipe para baixo
+            window.addEventListener('touchmove', function(e) {
+                // Só previne se estiver no topo da página e deslizando para baixo
                 if (window.scrollY === 0 && e.touches[0].clientY > touchStartY) {
                     e.preventDefault();
                 }
