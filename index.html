@@ -96,6 +96,40 @@
             right: 0;
         }
 
+        /* Botões de navegação */
+        .nav-button {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: rgba(98, 0, 238, 0.7);
+            color: white;
+            border: none;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 10;
+            transition: all 0.2s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .nav-button:hover {
+            background-color: rgba(98, 0, 238, 0.9);
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        #prev-button {
+            left: 10px;
+        }
+
+        #next-button {
+            right: 10px;
+        }
+
         #question {
             font-size: 24px;
             margin-bottom: 20px;
@@ -324,6 +358,11 @@
                 max-height: 65vh;
                 padding: 15px;
             }
+            .nav-button {
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+            }
         }
     </style>
 </head>
@@ -335,6 +374,10 @@
 
     <div id="content">
         <div id="card">
+            <!-- Botões de navegação adicionados -->
+            <button id="prev-button" class="nav-button">←</button>
+            <button id="next-button" class="nav-button">→</button>
+            
             <div id="card-content">
                 <!-- Zonas clicáveis para navegação (NOVO) -->
                 <div class="nav-zone" id="prev-zone"></div>
@@ -422,6 +465,8 @@
             const fileExport = document.getElementById('file-export');
             const prevZone = document.getElementById('prev-zone'); // NOVO
             const nextZone = document.getElementById('next-zone'); // NOVO
+            const prevButton = document.getElementById('prev-button'); // NOVO: Botão anterior
+            const nextButton = document.getElementById('next-button'); // NOVO: Botão próximo
 
             // Variáveis de estado
             let items = [];
@@ -455,10 +500,16 @@
             prevZone.addEventListener('click', prevItem);
             nextZone.addEventListener('click', nextItem);
             
+            // NOVO: Navegação por botões
+            prevButton.addEventListener('click', prevItem);
+            nextButton.addEventListener('click', nextItem);
+            
             // Clique no conteúdo para mostrar/ocultar resposta (modificado)
             cardContent.addEventListener('click', function(e) {
-                // Só mostra resposta se o clique não foi nas zonas de navegação
-                if (!e.target.classList.contains('nav-zone') && isQAMode) {
+                // Só mostra resposta se o clique não foi nas zonas de navegação ou botões
+                if (!e.target.classList.contains('nav-zone') && 
+                    !e.target.classList.contains('nav-button') && 
+                    isQAMode) {
                     answerEl.classList.toggle('visible');
                 }
             });
