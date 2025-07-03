@@ -78,7 +78,7 @@
             overflow-y: auto;
             padding: 10px;
             position: relative;
-            -webkit-overflow-scrolling: touch; /* Suave scroll no iOS */
+            -webkit-overflow-scrolling: touch;
         }
 
         /* Container para os botões e contador */
@@ -167,6 +167,7 @@
             background: #a0a0a0;
         }
 
+        /* Restante do CSS permanece igual */
         #menu {
             position: fixed;
             top: 0;
@@ -363,7 +364,6 @@
                 <div id="answer"></div>
             </div>
             
-            <!-- Rodapé com botões e contador -->
             <div class="card-footer">
                 <button id="prev-button" class="nav-button">◄</button>
                 <div id="counter">0 / 0</div>
@@ -372,6 +372,7 @@
         </div>
     </div>
 
+    <!-- Restante do HTML permanece igual -->
     <div id="menu">
         <div class="menu-item" id="import-file">
             <i>📁</i> Importar Ficheiro
@@ -453,9 +454,9 @@
             let currentIndex = 0;
             let isQAMode = true;
             let baseFontSize = 20;
-            let isScrolling = false;
             let touchStartX = 0;
             let touchStartY = 0;
+            let isSwiping = false;
 
             // Inicialização
             loadSampleData();
@@ -496,49 +497,51 @@
             });
 
             // Controle de touch para swipe horizontal e scroll vertical
-            card.addEventListener('touchstart', function(e) {
+            cardContent.addEventListener('touchstart', function(e) {
                 touchStartX = e.touches[0].clientX;
                 touchStartY = e.touches[0].clientY;
+                isSwiping = false;
             }, { passive: true });
 
-            card.addEventListener('touchmove', function(e) {
-                if (!cardContent.contains(e.target)) return;
-                
+            cardContent.addEventListener('touchmove', function(e) {
                 const touchX = e.touches[0].clientX;
                 const touchY = e.touches[0].clientY;
-                const diffX = touchX - touchStartX;
-                const diffY = touchY - touchStartY;
+                const diffX = Math.abs(touchX - touchStartX);
+                const diffY = Math.abs(touchY - touchStartY);
                 
-                // Se for movimento vertical predominante, permite scroll
-                if (Math.abs(diffY) > Math.abs(diffX)) {
-                    return;
-                }
-                
-                // Se for movimento horizontal, previne scroll para permitir navegação
-                if (Math.abs(diffX) > 10) {
+                // Se movimento for predominantemente horizontal, marca como swipe
+                if (diffX > diffY && diffX > 10) {
+                    isSwiping = true;
                     e.preventDefault();
                 }
+                // Movimento vertical (scroll) é permitido normalmente
             }, { passive: false });
 
-            card.addEventListener('touchend', function(e) {
-                const touchEndX = e.changedTouches[0].clientX;
-                const touchEndY = e.changedTouches[0].clientY;
-                const diffX = touchEndX - touchStartX;
-                const diffY = touchEndY - touchStartY;
+            cardContent.addEventListener('touchend', function(e) {
+                if (!isSwiping) return;
                 
-                // Só considera swipe se for predominante horizontal
-                if (Math.abs(diffX) > Math.abs(diffY)) {
-                    handleSwipe(diffX);
+                const touchEndX = e.changedTouches[0].clientX;
+                const diffX = touchEndX - touchStartX;
+                
+                // Limiar para considerar swipe
+                if (Math.abs(diffX) > 50) {
+                    if (diffX > 0) {
+                        prevItem();
+                    } else {
+                        nextItem();
+                    }
                 }
+                isSwiping = false;
             }, { passive: true });
 
             // Previne refresh da página com swipe para baixo
             window.addEventListener('touchstart', function(e) {
+                if (e.target === cardContent) return;
                 touchStartY = e.touches[0].clientY;
             }, { passive: true });
 
             window.addEventListener('touchmove', function(e) {
-                // Só previne se estiver no topo da página e deslizando para baixo
+                if (e.target === cardContent) return;
                 if (window.scrollY === 0 && e.touches[0].clientY > touchStartY) {
                     e.preventDefault();
                 }
@@ -561,6 +564,7 @@
                 }
             });
 
+            // Restante das funções permanece igual
             function toggleMenu() {
                 menu.classList.toggle('active');
                 overlay.classList.toggle('active');
@@ -666,28 +670,17 @@
             }
 
             function nextItem() {
-                if (items.length === 0 || isScrolling) return;
+                if (items.length === 0) return;
                 currentIndex = (currentIndex + 1) % items.length;
                 updateDisplay();
                 saveState();
             }
 
             function prevItem() {
-                if (items.length === 0 || isScrolling) return;
+                if (items.length === 0) return;
                 currentIndex = (currentIndex - 1 + items.length) % items.length;
                 updateDisplay();
                 saveState();
-            }
-
-            function handleSwipe(diffX) {
-                if (isScrolling) return;
-                
-                const threshold = 50;
-                if (diffX < -threshold) {
-                    nextItem();
-                } else if (diffX > threshold) {
-                    prevItem();
-                }
             }
 
             function shuffleItems() {
