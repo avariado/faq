@@ -611,10 +611,13 @@
                 for (const line of lines) {
                     if (line.trim() === '') continue;
                     
-                    const parts = line.split('\t');
+                    // Verifica primeiro por TAB, depois por ;;
+                    const separator = line.includes('\t') ? '\t' : ';;';
+                    const parts = line.split(separator);
+                    
                     if (parts.length >= 2) {
                         const question = parts[0].trim();
-                        const answer = parts.slice(1).join('\t').trim();
+                        const answer = parts.slice(1).join(separator).trim();
                         items.push({ question, answer });
                     } else {
                         items.push({ text: line.trim() });
@@ -752,8 +755,9 @@
                         }
                         
                         const hasTabs = contentString.includes('\t');
+                        const hasDoubleSemicolon = contentString.includes(';;');
                         
-                        if (hasTabs) {
+                        if (hasTabs || hasDoubleSemicolon) {
                             parseQAContent(contentString);
                         } else {
                             parseTextContent(contentString);
