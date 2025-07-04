@@ -2,13 +2,15 @@
 <html lang="pt">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Leitor Q&A</title>
     <style>
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
         }
 
         body {
@@ -16,10 +18,9 @@
             background-color: #f5f5f5;
             color: #333;
             line-height: 1.6;
-            display: flex;
-            flex-direction: column;
             height: 100vh;
             overflow: hidden;
+            position: relative;
         }
 
         header {
@@ -27,17 +28,29 @@
             color: white;
             padding: 15px;
             text-align: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            position: relative;
+            z-index: 10;
+        }
+
+        #menu-btn {
+            position: absolute;
+            left: 15px;
+            top: 15px;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 20;
         }
 
         #content {
-            flex: 1;
+            height: calc(100vh - 60px);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             padding: 20px;
-            overflow: hidden;
         }
 
         #card {
@@ -48,16 +61,25 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             padding: 30px;
             margin: 20px;
-            min-height: 300px;
-            max-height: 70vh;
-            display: flex;
-            flex-direction: column;
+            position: relative;
+            z-index: 5;
         }
 
-        #card-content {
-            flex: 1;
-            overflow-y: auto;
+        #question {
+            font-size: 24px;
+            margin-bottom: 20px;
+            word-wrap: break-word;
             padding: 10px;
+        }
+
+        #answer {
+            font-size: 20px;
+            color: #666;
+            word-wrap: break-word;
+            padding: 10px;
+            background-color: #f9f9f9;
+            margin-top: 10px;
+            display: none;
         }
 
         .card-footer {
@@ -78,23 +100,6 @@
             cursor: pointer;
         }
 
-        #question {
-            font-size: 24px;
-            margin-bottom: 20px;
-            word-wrap: break-word;
-            padding: 10px;
-        }
-
-        #answer {
-            font-size: 20px;
-            color: #666;
-            word-wrap: break-word;
-            padding: 10px;
-            background-color: #f9f9f9;
-            margin-top: 10px;
-            display: none;
-        }
-
         #counter {
             text-align: center;
             color: #666;
@@ -105,6 +110,7 @@
             margin: 0 10px;
         }
 
+        /* Menu styles - fixed position with higher z-index */
         #menu {
             position: fixed;
             top: 0;
@@ -112,10 +118,10 @@
             width: 300px;
             height: 100%;
             background: white;
-            box-shadow: 2px 0 5px rgba(0,0,0,0.2);
+            z-index: 1000;
             transition: left 0.3s;
             overflow-y: auto;
-            padding: 20px;
+            padding-top: 60px;
         }
 
         #menu.active {
@@ -123,11 +129,18 @@
         }
 
         .menu-item {
-            padding: 15px 10px;
+            padding: 15px 20px;
             border-bottom: 1px solid #eee;
             cursor: pointer;
+            background: white;
+            transition: background 0.2s;
         }
 
+        .menu-item:active {
+            background-color: #f0f0f0;
+        }
+
+        /* Overlay styles - fixed position below menu */
         #overlay {
             position: fixed;
             top: 0;
@@ -135,6 +148,7 @@
             width: 100%;
             height: 100%;
             background: rgba(0,0,0,0.5);
+            z-index: 999;
             display: none;
         }
 
@@ -142,6 +156,7 @@
             display: block;
         }
 
+        /* Font size controls */
         .font-size-controls {
             display: flex;
             align-items: center;
@@ -167,90 +182,113 @@
             font-size: 18px;
         }
 
+        /* Hide file input */
+        #file-input {
+            display: none;
+        }
+
         @media (max-width: 600px) {
             #menu {
                 width: 80%;
                 left: -80%;
-            }
-            #question {
-                font-size: 22px;
-            }
-            #answer {
-                font-size: 18px;
-            }
-            #card {
-                padding: 15px;
             }
         }
     </style>
 </head>
 <body>
     <header>
-        <button onclick="document.getElementById('menu').classList.toggle('active'); 
-                        document.getElementById('overlay').classList.toggle('active');">☰</button>
+        <button id="menu-btn">☰</button>
         <h1>Leitor Q&A</h1>
     </header>
 
     <div id="content">
         <div id="card">
-            <div id="card-content">
-                <div id="question" onclick="document.getElementById('answer').style.display = 
-                    document.getElementById('answer').style.display === 'none' ? 'block' : 'none'">
-                </div>
-                <div id="answer"></div>
-            </div>
+            <div id="question"></div>
+            <div id="answer"></div>
             
             <div class="card-footer">
-                <button class="nav-button" onclick="prevItem()">◄</button>
+                <button class="nav-button" id="prev-btn">◄</button>
                 <div id="counter">0 / 0</div>
-                <button class="nav-button" onclick="nextItem()">►</button>
+                <button class="nav-button" id="next-btn">►</button>
             </div>
         </div>
     </div>
 
+    <!-- Menu - position fixed with high z-index -->
     <div id="menu">
-        <div class="menu-item" onclick="document.getElementById('file-input').click()">
+        <div class="menu-item" id="import-btn">
             📁 Importar Ficheiro
         </div>
-        <div class="menu-item" onclick="exportFile()">
+        <div class="menu-item" id="export-btn">
             💾 Exportar Ficheiro
         </div>
         <div class="menu-item">
             🔠 Tamanho da Fonte
             <div class="font-size-controls">
-                <button class="font-size-btn" onclick="changeFontSize(-2)">-</button>
+                <button class="font-size-btn" id="decrease-font">-</button>
                 <span id="current-font-size">20</span>
-                <button class="font-size-btn" onclick="changeFontSize(2)">+</button>
+                <button class="font-size-btn" id="increase-font">+</button>
             </div>
         </div>
     </div>
 
-    <div id="overlay" onclick="document.getElementById('menu').classList.remove('active');
-                              this.classList.remove('active')"></div>
+    <!-- Overlay - separate from menu -->
+    <div id="overlay"></div>
 
-    <input type="file" id="file-input" accept=".txt" style="display:none" onchange="handleFileImport(this)">
+    <input type="file" id="file-input" accept=".txt">
 
     <script>
-        // Variáveis globais
-        var items = [];
+        // Dados iniciais
+        var items = [
+            {question: "O que é HTML?", answer: "Linguagem de marcação para criar páginas web."},
+            {question: "O que é CSS?", answer: "Linguagem para estilizar páginas web."}
+        ];
         var currentIndex = 0;
         var baseFontSize = 20;
 
-        // Dados de exemplo
-        var sampleData = [
-            {question: "O que é HTML?", answer: "HTML é a linguagem de marcação padrão para criar páginas web."},
-            {question: "O que é CSS?", answer: "CSS é a linguagem de estilos usada para descrever a apresentação de um documento HTML."}
-        ];
+        // Elementos DOM
+        var questionEl = document.getElementById('question');
+        var answerEl = document.getElementById('answer');
+        var counterEl = document.getElementById('counter');
+        var menuBtn = document.getElementById('menu-btn');
+        var menu = document.getElementById('menu');
+        var overlay = document.getElementById('overlay');
+        var prevBtn = document.getElementById('prev-btn');
+        var nextBtn = document.getElementById('next-btn');
+        var importBtn = document.getElementById('import-btn');
+        var exportBtn = document.getElementById('export-btn');
+        var increaseFontBtn = document.getElementById('increase-font');
+        var decreaseFontBtn = document.getElementById('decrease-font');
+        var fileInput = document.getElementById('file-input');
 
         // Inicialização
-        items = sampleData;
         updateDisplay();
+        updateFontSize();
 
-        // Funções de navegação
-        function nextItem() {
-            if (items.length === 0) return;
-            currentIndex = (currentIndex + 1) % items.length;
-            updateDisplay();
+        // Event listeners com touchstart
+        menuBtn.addEventListener('click', toggleMenu);
+        overlay.addEventListener('click', toggleMenu);
+        
+        // Usar click para melhor compatibilidade
+        prevBtn.addEventListener('click', prevItem);
+        nextBtn.addEventListener('click', nextItem);
+        questionEl.addEventListener('click', toggleAnswer);
+        importBtn.addEventListener('click', function() { fileInput.click(); });
+        exportBtn.addEventListener('click', exportFile);
+        increaseFontBtn.addEventListener('click', function() { changeFontSize(2); });
+        decreaseFontBtn.addEventListener('click', function() { changeFontSize(-2); });
+        
+        // File input change
+        fileInput.addEventListener('change', handleFileImport);
+
+        // Funções principais
+        function toggleMenu() {
+            menu.classList.toggle('active');
+            overlay.classList.toggle('active');
+        }
+
+        function toggleAnswer() {
+            answerEl.style.display = answerEl.style.display === 'none' ? 'block' : 'none';
         }
 
         function prevItem() {
@@ -259,40 +297,42 @@
             updateDisplay();
         }
 
+        function nextItem() {
+            if (items.length === 0) return;
+            currentIndex = (currentIndex + 1) % items.length;
+            updateDisplay();
+        }
+
         function updateDisplay() {
             if (items.length === 0) {
-                document.getElementById('question').textContent = "Nenhum conteúdo carregado.";
-                document.getElementById('answer').textContent = "";
-                document.getElementById('counter').textContent = "0 / 0";
+                questionEl.textContent = "Nenhum conteúdo carregado.";
+                answerEl.textContent = "";
+                counterEl.textContent = "0 / 0";
                 return;
             }
 
-            var currentItem = items[currentIndex];
-            document.getElementById('question').textContent = currentItem.question;
-            document.getElementById('answer').textContent = currentItem.answer;
-            document.getElementById('answer').style.display = 'none';
-            document.getElementById('counter').textContent = (currentIndex + 1) + " / " + items.length;
+            questionEl.textContent = items[currentIndex].question;
+            answerEl.textContent = items[currentIndex].answer;
+            answerEl.style.display = 'none';
+            counterEl.textContent = (currentIndex + 1) + " / " + items.length;
         }
 
-        // Controle de tamanho de fonte
         function changeFontSize(delta) {
             baseFontSize = Math.max(12, Math.min(32, baseFontSize + delta));
             document.getElementById('current-font-size').textContent = baseFontSize;
-            document.getElementById('question').style.fontSize = baseFontSize + 'px';
-            document.getElementById('answer').style.fontSize = (baseFontSize - 2) + 'px';
+            questionEl.style.fontSize = baseFontSize + 'px';
+            answerEl.style.fontSize = (baseFontSize - 2) + 'px';
         }
 
-        // Importação de arquivo
-        function handleFileImport(input) {
-            var file = input.files[0];
+        function handleFileImport(event) {
+            var file = event.target.files[0];
             if (!file) return;
 
             var reader = new FileReader();
             reader.onload = function(e) {
                 var content = e.target.result;
                 parseFileContent(content);
-                document.getElementById('menu').classList.remove('active');
-                document.getElementById('overlay').classList.remove('active');
+                toggleMenu();
             };
             reader.readAsText(file);
         }
@@ -320,7 +360,6 @@
             updateDisplay();
         }
 
-        // Exportação de arquivo
         function exportFile() {
             if (items.length === 0) return;
             
@@ -339,8 +378,13 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             
-            document.getElementById('menu').classList.remove('active');
-            document.getElementById('overlay').classList.remove('active');
+            toggleMenu();
+        }
+
+        function updateFontSize() {
+            questionEl.style.fontSize = baseFontSize + 'px';
+            answerEl.style.fontSize = (baseFontSize - 2) + 'px';
+            document.getElementById('current-font-size').textContent = baseFontSize;
         }
     </script>
 </body>
