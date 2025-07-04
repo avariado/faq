@@ -547,6 +547,18 @@
                     prevItem();
                 } else if (e.key === 'ArrowRight') {
                     nextItem();
+                } else if (e.key === 'ArrowUp') {
+                    // Rolar para cima quando a barra de rolagem estiver visível
+                    if (cardContent.scrollHeight > cardContent.clientHeight) {
+                        e.preventDefault();
+                        cardContent.scrollBy(0, -50);
+                    }
+                } else if (e.key === 'ArrowDown') {
+                    // Rolar para baixo quando a barra de rolagem estiver visível
+                    if (cardContent.scrollHeight > cardContent.clientHeight) {
+                        e.preventDefault();
+                        cardContent.scrollBy(0, 50);
+                    }
                 } else if (e.key === ' ' || e.key === 'Enter') {
                     if (isQAMode) {
                         answerEl.classList.toggle('visible');
