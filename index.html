@@ -513,15 +513,19 @@
 
             cardContent.addEventListener('touchend', function(e) {
                 const touchEndX = e.changedTouches[0].clientX;
+                const touchEndY = e.changedTouches[0].clientY;
                 const diffX = touchEndX - touchStartX;
+                const diffY = touchEndY - touchStartY;
 
-                if (Math.abs(diffX) > 50) {
+                // Verifica se foi um swipe horizontal (não vertical)
+                if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
                     if (diffX > 0) {
                         prevItem();
                     } else {
                         nextItem();
                     }
                 }
+                // Ignora completamente swipes verticais
             }, { passive: true });
 
             // Prevenção de refresh apenas no body (fora do card)
