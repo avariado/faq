@@ -2,17 +2,15 @@
 <html lang="pt">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Leitor Q&A</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leitor Q&A Completo</title>
     <style>
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            -webkit-tap-highlight-color: transparent;
-            touch-action: manipulation;
         }
-
+        
         body {
             font-family: Arial, sans-serif;
             background-color: #f5f5f5;
@@ -20,18 +18,16 @@
             line-height: 1.6;
             height: 100vh;
             overflow: hidden;
-            position: relative;
         }
-
+        
         header {
             background-color: #6200ee;
             color: white;
             padding: 15px;
             text-align: center;
             position: relative;
-            z-index: 10;
         }
-
+        
         #menu-btn {
             position: absolute;
             left: 15px;
@@ -41,9 +37,8 @@
             color: white;
             font-size: 24px;
             cursor: pointer;
-            z-index: 20;
         }
-
+        
         #content {
             height: calc(100vh - 60px);
             display: flex;
@@ -52,7 +47,7 @@
             justify-content: center;
             padding: 20px;
         }
-
+        
         #card {
             width: 100%;
             max-width: 800px;
@@ -61,17 +56,15 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             padding: 30px;
             margin: 20px;
-            position: relative;
-            z-index: 5;
         }
-
+        
         #question {
             font-size: 24px;
             margin-bottom: 20px;
             word-wrap: break-word;
             padding: 10px;
         }
-
+        
         #answer {
             font-size: 20px;
             color: #666;
@@ -81,14 +74,14 @@
             margin-top: 10px;
             display: none;
         }
-
+        
         .card-footer {
             display: flex;
             align-items: center;
             justify-content: space-between;
             margin-top: 15px;
         }
-
+        
         .nav-button {
             width: 36px;
             height: 36px;
@@ -99,7 +92,7 @@
             font-size: 18px;
             cursor: pointer;
         }
-
+        
         #counter {
             text-align: center;
             color: #666;
@@ -109,8 +102,8 @@
             border-radius: 20px;
             margin: 0 10px;
         }
-
-        /* Menu styles - fixed position with higher z-index */
+        
+        /* Menu styles */
         #menu {
             position: fixed;
             top: 0;
@@ -118,29 +111,23 @@
             width: 300px;
             height: 100%;
             background: white;
-            z-index: 1000;
             transition: left 0.3s;
             overflow-y: auto;
             padding-top: 60px;
+            z-index: 1000;
         }
-
+        
         #menu.active {
             left: 0;
         }
-
+        
         .menu-item {
             padding: 15px 20px;
             border-bottom: 1px solid #eee;
             cursor: pointer;
-            background: white;
-            transition: background 0.2s;
         }
-
-        .menu-item:active {
-            background-color: #f0f0f0;
-        }
-
-        /* Overlay styles - fixed position below menu */
+        
+        /* Overlay */
         #overlay {
             position: fixed;
             top: 0;
@@ -148,22 +135,77 @@
             width: 100%;
             height: 100%;
             background: rgba(0,0,0,0.5);
-            z-index: 999;
             display: none;
+            z-index: 999;
         }
-
+        
         #overlay.active {
             display: block;
         }
-
-        /* Font size controls */
+        
+        /* Modal de edição */
+        #edit-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            z-index: 1001;
+            display: none;
+        }
+        
+        #edit-modal.active {
+            display: block;
+        }
+        
+        #content-editor {
+            width: 100%;
+            height: 300px;
+            padding: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .btn-primary {
+            background-color: #6200ee;
+            color: white;
+        }
+        
+        .btn-secondary {
+            background-color: #e0e0e0;
+        }
+        
+        /* Controles adicionais */
+        #jump-to-input {
+            width: 60px;
+            padding: 8px;
+            margin: 0 10px;
+            text-align: center;
+        }
+        
         .font-size-controls {
             display: flex;
             align-items: center;
             justify-content: center;
             margin-top: 10px;
         }
-
+        
         .font-size-btn {
             width: 30px;
             height: 30px;
@@ -171,22 +213,24 @@
             background: #6200ee;
             color: white;
             border: none;
-            font-size: 18px;
             cursor: pointer;
         }
-
+        
         #current-font-size {
             margin: 0 15px;
             min-width: 30px;
             text-align: center;
-            font-size: 18px;
         }
-
-        /* Hide file input */
+        
+        /* Inputs de arquivo ocultos */
         #file-input {
             display: none;
         }
-
+        
+        #file-export {
+            display: none;
+        }
+        
         @media (max-width: 600px) {
             #menu {
                 width: 80%;
@@ -214,13 +258,27 @@
         </div>
     </div>
 
-    <!-- Menu - position fixed with high z-index -->
+    <!-- Menu principal -->
     <div id="menu">
         <div class="menu-item" id="import-btn">
             📁 Importar Ficheiro
         </div>
         <div class="menu-item" id="export-btn">
             💾 Exportar Ficheiro
+        </div>
+        <div class="menu-item" id="edit-btn">
+            ✏️ Editar Conteúdo
+        </div>
+        <div class="menu-item" id="shuffle-btn">
+            🔀 Baralhar Perguntas
+        </div>
+        <div class="menu-item" id="reset-btn">
+            🔄 Repor Ordem Original
+        </div>
+        <div class="menu-item">
+            🔢 Ir para Pergunta: 
+            <input type="number" id="jump-to-input" min="1">
+            <button class="btn btn-primary" id="jump-btn">Ir</button>
         </div>
         <div class="menu-item">
             🔠 Tamanho da Fonte
@@ -232,78 +290,61 @@
         </div>
     </div>
 
-    <!-- Overlay - separate from menu -->
+    <!-- Overlay -->
     <div id="overlay"></div>
 
+    <!-- Modal de edição -->
+    <div id="edit-modal">
+        <h2>Editar Conteúdo</h2>
+        <textarea id="content-editor"></textarea>
+        <div class="modal-buttons">
+            <button class="btn btn-secondary" id="cancel-edit">Cancelar</button>
+            <button class="btn btn-primary" id="save-edit">Guardar</button>
+        </div>
+    </div>
+
+    <!-- Inputs ocultos -->
     <input type="file" id="file-input" accept=".txt">
+    <a id="file-export" download="perguntas_respostas.txt"></a>
+
+    <!-- Formulário oculto para baralhar -->
+    <form id="shuffle-form" style="display:none"></form>
+
+    <!-- Toda a lógica em HTML puro usando forms e buttons -->
+    <form id="main-form" style="display:none">
+        <input type="hidden" id="current-index" name="current-index" value="0">
+        <input type="hidden" id="base-font-size" name="base-font-size" value="20">
+        <textarea id="items-data" name="items-data">[
+            {"question":"O que é HTML?","answer":"Linguagem de marcação para criar páginas web."},
+            {"question":"O que é CSS?","answer":"Linguagem para estilizar páginas web."}
+        ]</textarea>
+        <textarea id="original-items" name="original-items"></textarea>
+    </form>
 
     <script>
-        // Dados iniciais
-        var items = [
-            {question: "O que é HTML?", answer: "Linguagem de marcação para criar páginas web."},
-            {question: "O que é CSS?", answer: "Linguagem para estilizar páginas web."}
-        ];
-        var currentIndex = 0;
-        var baseFontSize = 20;
-
-        // Elementos DOM
-        var questionEl = document.getElementById('question');
-        var answerEl = document.getElementById('answer');
-        var counterEl = document.getElementById('counter');
-        var menuBtn = document.getElementById('menu-btn');
-        var menu = document.getElementById('menu');
-        var overlay = document.getElementById('overlay');
-        var prevBtn = document.getElementById('prev-btn');
-        var nextBtn = document.getElementById('next-btn');
-        var importBtn = document.getElementById('import-btn');
-        var exportBtn = document.getElementById('export-btn');
-        var increaseFontBtn = document.getElementById('increase-font');
-        var decreaseFontBtn = document.getElementById('decrease-font');
-        var fileInput = document.getElementById('file-input');
-
-        // Inicialização
-        updateDisplay();
-        updateFontSize();
-
-        // Event listeners com touchstart
-        menuBtn.addEventListener('click', toggleMenu);
-        overlay.addEventListener('click', toggleMenu);
-        
-        // Usar click para melhor compatibilidade
-        prevBtn.addEventListener('click', prevItem);
-        nextBtn.addEventListener('click', nextItem);
-        questionEl.addEventListener('click', toggleAnswer);
-        importBtn.addEventListener('click', function() { fileInput.click(); });
-        exportBtn.addEventListener('click', exportFile);
-        increaseFontBtn.addEventListener('click', function() { changeFontSize(2); });
-        decreaseFontBtn.addEventListener('click', function() { changeFontSize(-2); });
-        
-        // File input change
-        fileInput.addEventListener('change', handleFileImport);
-
-        // Funções principais
-        function toggleMenu() {
-            menu.classList.toggle('active');
-            overlay.classList.toggle('active');
-        }
-
-        function toggleAnswer() {
-            answerEl.style.display = answerEl.style.display === 'none' ? 'block' : 'none';
-        }
-
-        function prevItem() {
-            if (items.length === 0) return;
-            currentIndex = (currentIndex - 1 + items.length) % items.length;
+        // Esta seção JavaScript é opcional e só para inicialização
+        // Pode ser removida se você configurar os valores iniciais no HTML
+        document.addEventListener('DOMContentLoaded', function() {
+            // Inicializa os dados se estiverem vazios
+            var itemsData = document.getElementById('items-data');
+            if (!itemsData.value || itemsData.value.trim() === '') {
+                itemsData.value = JSON.stringify([
+                    {question: "O que é HTML?", answer: "Linguagem de marcação para criar páginas web."},
+                    {question: "O que é CSS?", answer: "Linguagem para estilizar páginas web."}
+                ]);
+            }
+            
+            // Atualiza a exibição inicial
             updateDisplay();
-        }
-
-        function nextItem() {
-            if (items.length === 0) return;
-            currentIndex = (currentIndex + 1) % items.length;
-            updateDisplay();
-        }
+        });
 
         function updateDisplay() {
+            var items = JSON.parse(document.getElementById('items-data').value);
+            var currentIndex = parseInt(document.getElementById('current-index').value);
+            var questionEl = document.getElementById('question');
+            var answerEl = document.getElementById('answer');
+            var counterEl = document.getElementById('counter');
+            
             if (items.length === 0) {
                 questionEl.textContent = "Nenhum conteúdo carregado.";
                 answerEl.textContent = "";
@@ -315,13 +356,69 @@
             answerEl.textContent = items[currentIndex].answer;
             answerEl.style.display = 'none';
             counterEl.textContent = (currentIndex + 1) + " / " + items.length;
+            
+            // Atualiza o campo de salto
+            document.getElementById('jump-to-input').value = currentIndex + 1;
+            document.getElementById('jump-to-input').max = items.length;
+        }
+
+        function toggleAnswer() {
+            var answerEl = document.getElementById('answer');
+            answerEl.style.display = answerEl.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function toggleMenu() {
+            document.getElementById('menu').classList.toggle('active');
+            document.getElementById('overlay').classList.toggle('active');
+        }
+
+        function toggleEditModal() {
+            document.getElementById('edit-modal').classList.toggle('active');
+            
+            if (document.getElementById('edit-modal').classList.contains('active')) {
+                var items = JSON.parse(document.getElementById('items-data').value);
+                var content = items.map(item => item.question + '\t' + item.answer).join('\n');
+                document.getElementById('content-editor').value = content;
+            }
+        }
+
+        function prevItem() {
+            var currentIndex = parseInt(document.getElementById('current-index').value);
+            var items = JSON.parse(document.getElementById('items-data').value);
+            
+            currentIndex = (currentIndex - 1 + items.length) % items.length;
+            document.getElementById('current-index').value = currentIndex;
+            updateDisplay();
+        }
+
+        function nextItem() {
+            var currentIndex = parseInt(document.getElementById('current-index').value);
+            var items = JSON.parse(document.getElementById('items-data').value);
+            
+            currentIndex = (currentIndex + 1) % items.length;
+            document.getElementById('current-index').value = currentIndex;
+            updateDisplay();
+        }
+
+        function jumpToQuestion() {
+            var num = parseInt(document.getElementById('jump-to-input').value);
+            var items = JSON.parse(document.getElementById('items-data').value);
+            
+            if (num >= 1 && num <= items.length) {
+                document.getElementById('current-index').value = num - 1;
+                updateDisplay();
+            }
+            toggleMenu();
         }
 
         function changeFontSize(delta) {
-            baseFontSize = Math.max(12, Math.min(32, baseFontSize + delta));
-            document.getElementById('current-font-size').textContent = baseFontSize;
-            questionEl.style.fontSize = baseFontSize + 'px';
-            answerEl.style.fontSize = (baseFontSize - 2) + 'px';
+            var size = parseInt(document.getElementById('base-font-size').value);
+            size = Math.max(12, Math.min(32, size + delta));
+            document.getElementById('base-font-size').value = size;
+            document.getElementById('current-font-size').textContent = size;
+            
+            document.getElementById('question').style.fontSize = size + 'px';
+            document.getElementById('answer').style.fontSize = (size - 2) + 'px';
         }
 
         function handleFileImport(event) {
@@ -330,8 +427,7 @@
 
             var reader = new FileReader();
             reader.onload = function(e) {
-                var content = e.target.result;
-                parseFileContent(content);
+                parseFileContent(e.target.result);
                 toggleMenu();
             };
             reader.readAsText(file);
@@ -339,7 +435,7 @@
 
         function parseFileContent(content) {
             var lines = content.split('\n');
-            items = [];
+            var items = [];
             
             for (var i = 0; i < lines.length; i++) {
                 var line = lines[i].trim();
@@ -356,36 +452,101 @@
                 }
             }
             
-            currentIndex = 0;
+            document.getElementById('items-data').value = JSON.stringify(items);
+            document.getElementById('original-items').value = JSON.stringify(items);
+            document.getElementById('current-index').value = 0;
             updateDisplay();
         }
 
         function exportFile() {
-            if (items.length === 0) return;
-            
-            var content = items.map(function(item) {
-                return item.question + '\t' + item.answer;
-            }).join('\n');
+            var items = JSON.parse(document.getElementById('items-data').value);
+            var content = items.map(item => item.question + '\t' + item.answer).join('\n');
             
             var blob = new Blob([content], { type: 'text/plain' });
             var url = URL.createObjectURL(blob);
             
-            var a = document.createElement('a');
-            a.href = url;
-            a.download = 'perguntas_respostas.txt';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            document.getElementById('file-export').href = url;
+            document.getElementById('file-export').click();
             
+            URL.revokeObjectURL(url);
             toggleMenu();
         }
 
-        function updateFontSize() {
-            questionEl.style.fontSize = baseFontSize + 'px';
-            answerEl.style.fontSize = (baseFontSize - 2) + 'px';
-            document.getElementById('current-font-size').textContent = baseFontSize;
+        function shuffleItems() {
+            var items = JSON.parse(document.getElementById('items-data').value);
+            
+            // Fisher-Yates shuffle algorithm
+            for (var i = items.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                [items[i], items[j]] = [items[j], items[i]];
+            }
+            
+            document.getElementById('items-data').value = JSON.stringify(items);
+            document.getElementById('current-index').value = 0;
+            updateDisplay();
+            toggleMenu();
         }
+
+        function resetOrder() {
+            var originalItems = document.getElementById('original-items').value;
+            if (originalItems && originalItems.trim() !== '') {
+                document.getElementById('items-data').value = originalItems;
+                document.getElementById('current-index').value = 0;
+                updateDisplay();
+                toggleMenu();
+            }
+        }
+
+        function saveContent() {
+            var text = document.getElementById('content-editor').value;
+            var lines = text.split('\n');
+            var items = [];
+            
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i].trim();
+                if (line === '') continue;
+                
+                var parts = line.split('\t');
+                if (parts.length < 2) parts = line.split(';;');
+                
+                if (parts.length >= 2) {
+                    items.push({
+                        question: parts[0].trim(),
+                        answer: parts.slice(1).join('\t').trim()
+                    });
+                }
+            }
+            
+            document.getElementById('items-data').value = JSON.stringify(items);
+            document.getElementById('original-items').value = JSON.stringify(items);
+            document.getElementById('current-index').value = 0;
+            updateDisplay();
+            toggleEditModal();
+        }
+
+        // Event listeners
+        document.getElementById('menu-btn').addEventListener('click', toggleMenu);
+        document.getElementById('overlay').addEventListener('click', toggleMenu);
+        document.getElementById('prev-btn').addEventListener('click', prevItem);
+        document.getElementById('next-btn').addEventListener('click', nextItem);
+        document.getElementById('question').addEventListener('click', toggleAnswer);
+        document.getElementById('import-btn').addEventListener('click', function() {
+            document.getElementById('file-input').click();
+        });
+        document.getElementById('export-btn').addEventListener('click', exportFile);
+        document.getElementById('edit-btn').addEventListener('click', toggleEditModal);
+        document.getElementById('shuffle-btn').addEventListener('click', shuffleItems);
+        document.getElementById('reset-btn').addEventListener('click', resetOrder);
+        document.getElementById('jump-btn').addEventListener('click', jumpToQuestion);
+        document.getElementById('increase-font').addEventListener('click', function() {
+            changeFontSize(2);
+        });
+        document.getElementById('decrease-font').addEventListener('click', function() {
+            changeFontSize(-2);
+        });
+        document.getElementById('file-input').addEventListener('change', handleFileImport);
+        document.getElementById('cancel-edit').addEventListener('click', toggleEditModal);
+        document.getElementById('save-edit').addEventListener('click', saveContent);
     </script>
 </body>
 </html>
