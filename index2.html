@@ -9,6 +9,7 @@
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+            -webkit-tap-highlight-color: transparent;
         }
         
         body {
@@ -18,6 +19,7 @@
             line-height: 1.6;
             height: 100vh;
             overflow: hidden;
+            touch-action: manipulation;
         }
         
         header {
@@ -222,13 +224,18 @@
             text-align: center;
         }
         
-        /* Inputs de arquivo ocultos */
-        #file-input {
+        /* Mensagem de status */
+        #status-message {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
             display: none;
-        }
-        
-        #file-export {
-            display: none;
+            z-index: 1002;
         }
         
         @media (max-width: 600px) {
@@ -303,12 +310,14 @@
         </div>
     </div>
 
-    <!-- Inputs ocultos -->
-    <input type="file" id="file-input" accept=".txt">
-    <a id="file-export" download="perguntas_respostas.txt"></a>
+    <!-- Mensagem de status -->
+    <div id="status-message"></div>
 
-    <!-- Formulário oculto para baralhar -->
-    <form id="shuffle-form" style="display:none"></form>
+    <!-- Formulário oculto para comunicação com o App Inventor -->
+    <form id="app-inventor-form" style="display:none">
+        <input type="hidden" id="action-type">
+        <textarea id="file-content"></textarea>
+    </form>
 
     <!-- Toda a lógica em HTML puro usando forms e buttons -->
     <form id="main-form" style="display:none">
@@ -322,231 +331,329 @@
     </form>
 
     <script>
-        // Esta seção JavaScript é opcional e só para inicialização
-        // Pode ser removida se você configurar os valores iniciais no HTML
-        document.addEventListener('DOMContentLoaded', function() {
-            // Inicializa os dados se estiverem vazios
-            var itemsData = document.getElementById('items-data');
-            if (!itemsData.value || itemsData.value.trim() === '') {
-                itemsData.value = JSON.stringify([
-                    {question: "O que é HTML?", answer: "Linguagem de marcação para criar páginas web."},
-                    {question: "O que é CSS?", answer: "Linguagem para estilizar páginas web."}
-                ]);
-            }
-            
-            // Atualiza a exibição inicial
-            updateDisplay();
-        });
-
-        function updateDisplay() {
-            var items = JSON.parse(document.getElementById('items-data').value);
-            var currentIndex = parseInt(document.getElementById('current-index').value);
-            var questionEl = document.getElementById('question');
-            var answerEl = document.getElementById('answer');
-            var counterEl = document.getElementById('counter');
-            
-            if (items.length === 0) {
-                questionEl.textContent = "Nenhum conteúdo carregado.";
-                answerEl.textContent = "";
-                counterEl.textContent = "0 / 0";
-                return;
-            }
-
-            questionEl.textContent = items[currentIndex].question;
-            answerEl.textContent = items[currentIndex].answer;
-            answerEl.style.display = 'none';
-            counterEl.textContent = (currentIndex + 1) + " / " + items.length;
-            
-            // Atualiza o campo de salto
-            document.getElementById('jump-to-input').value = currentIndex + 1;
-            document.getElementById('jump-to-input').max = items.length;
+        // Função para mostrar mensagem de status
+        function showStatus(message, duration = 2000) {
+            var statusEl = document.getElementById('status-message');
+            statusEl.textContent = message;
+            statusEl.style.display = 'block';
+            setTimeout(function() {
+                statusEl.style.display = 'none';
+            }, duration);
         }
 
+        // Função para comunicação com o App Inventor
+        function callAppInventor(action, data) {
+            var form = document.getElementById('app-inventor-form');
+            document.getElementById('action-type').value = action;
+            document.getElementById('file-content').value = data || '';
+            form.submit();
+        }
+
+        // Função para atualizar a exibição
+        function updateDisplay() {
+            try {
+                var items = JSON.parse(document.getElementById('items-data').value);
+                var currentIndex = parseInt(document.getElementById('current-index').value);
+                var questionEl = document.getElementById('question');
+                var answerEl = document.getElementById('answer');
+                var counterEl = document.getElementById('counter');
+                
+                if (!items || items.length === 0) {
+                    questionEl.textContent = "Nenhum conteúdo carregado.";
+                    answerEl.textContent = "";
+                    counterEl.textContent = "0 / 0";
+                    return;
+                }
+
+                questionEl.textContent = items[currentIndex].question;
+                answerEl.textContent = items[currentIndex].answer;
+                answerEl.style.display = 'none';
+                counterEl.textContent = (currentIndex + 1) + " / " + items.length;
+                
+                // Atualiza o campo de salto
+                document.getElementById('jump-to-input').value = currentIndex + 1;
+                document.getElementById('jump-to-input').max = items.length;
+            } catch (e) {
+                console.error("Erro ao atualizar display:", e);
+            }
+        }
+
+        // Função para alternar a resposta
         function toggleAnswer() {
             var answerEl = document.getElementById('answer');
             answerEl.style.display = answerEl.style.display === 'none' ? 'block' : 'none';
         }
 
+        // Função para alternar o menu
         function toggleMenu() {
             document.getElementById('menu').classList.toggle('active');
             document.getElementById('overlay').classList.toggle('active');
         }
 
+        // Função para alternar o modal de edição
         function toggleEditModal() {
             document.getElementById('edit-modal').classList.toggle('active');
             
             if (document.getElementById('edit-modal').classList.contains('active')) {
-                var items = JSON.parse(document.getElementById('items-data').value);
-                var content = items.map(item => item.question + '\t' + item.answer).join('\n');
-                document.getElementById('content-editor').value = content;
+                try {
+                    var items = JSON.parse(document.getElementById('items-data').value);
+                    var content = items.map(item => item.question + '\t' + item.answer).join('\n');
+                    document.getElementById('content-editor').value = content;
+                } catch (e) {
+                    console.error("Erro ao abrir editor:", e);
+                    document.getElementById('content-editor').value = "";
+                }
             }
         }
 
+        // Funções de navegação
         function prevItem() {
-            var currentIndex = parseInt(document.getElementById('current-index').value);
-            var items = JSON.parse(document.getElementById('items-data').value);
-            
-            currentIndex = (currentIndex - 1 + items.length) % items.length;
-            document.getElementById('current-index').value = currentIndex;
-            updateDisplay();
+            try {
+                var currentIndex = parseInt(document.getElementById('current-index').value);
+                var items = JSON.parse(document.getElementById('items-data').value);
+                
+                currentIndex = (currentIndex - 1 + items.length) % items.length;
+                document.getElementById('current-index').value = currentIndex;
+                updateDisplay();
+            } catch (e) {
+                console.error("Erro ao navegar para anterior:", e);
+            }
         }
 
         function nextItem() {
-            var currentIndex = parseInt(document.getElementById('current-index').value);
-            var items = JSON.parse(document.getElementById('items-data').value);
-            
-            currentIndex = (currentIndex + 1) % items.length;
-            document.getElementById('current-index').value = currentIndex;
-            updateDisplay();
-        }
-
-        function jumpToQuestion() {
-            var num = parseInt(document.getElementById('jump-to-input').value);
-            var items = JSON.parse(document.getElementById('items-data').value);
-            
-            if (num >= 1 && num <= items.length) {
-                document.getElementById('current-index').value = num - 1;
+            try {
+                var currentIndex = parseInt(document.getElementById('current-index').value);
+                var items = JSON.parse(document.getElementById('items-data').value);
+                
+                currentIndex = (currentIndex + 1) % items.length;
+                document.getElementById('current-index').value = currentIndex;
                 updateDisplay();
+            } catch (e) {
+                console.error("Erro ao navegar para próximo:", e);
             }
-            toggleMenu();
         }
 
-        function changeFontSize(delta) {
-            var size = parseInt(document.getElementById('base-font-size').value);
-            size = Math.max(12, Math.min(32, size + delta));
-            document.getElementById('base-font-size').value = size;
-            document.getElementById('current-font-size').textContent = size;
-            
-            document.getElementById('question').style.fontSize = size + 'px';
-            document.getElementById('answer').style.fontSize = (size - 2) + 'px';
-        }
-
-        function handleFileImport(event) {
-            var file = event.target.files[0];
-            if (!file) return;
-
-            var reader = new FileReader();
-            reader.onload = function(e) {
-                parseFileContent(e.target.result);
-                toggleMenu();
-            };
-            reader.readAsText(file);
-        }
-
-        function parseFileContent(content) {
-            var lines = content.split('\n');
-            var items = [];
-            
-            for (var i = 0; i < lines.length; i++) {
-                var line = lines[i].trim();
-                if (line === '') continue;
+        // Função para saltar para uma pergunta específica
+        function jumpToQuestion() {
+            try {
+                var num = parseInt(document.getElementById('jump-to-input').value);
+                var items = JSON.parse(document.getElementById('items-data').value);
                 
-                var parts = line.split('\t');
-                if (parts.length < 2) parts = line.split(';;');
-                
-                if (parts.length >= 2) {
-                    items.push({
-                        question: parts[0].trim(),
-                        answer: parts.slice(1).join('\t').trim()
-                    });
+                if (num >= 1 && num <= items.length) {
+                    document.getElementById('current-index').value = num - 1;
+                    updateDisplay();
                 }
+                toggleMenu();
+            } catch (e) {
+                console.error("Erro ao saltar para pergunta:", e);
             }
-            
-            document.getElementById('items-data').value = JSON.stringify(items);
-            document.getElementById('original-items').value = JSON.stringify(items);
-            document.getElementById('current-index').value = 0;
-            updateDisplay();
         }
 
+        // Função para alterar o tamanho da fonte
+        function changeFontSize(delta) {
+            try {
+                var size = parseInt(document.getElementById('base-font-size').value);
+                size = Math.max(12, Math.min(32, size + delta));
+                document.getElementById('base-font-size').value = size;
+                document.getElementById('current-font-size').textContent = size;
+                
+                document.getElementById('question').style.fontSize = size + 'px';
+                document.getElementById('answer').style.fontSize = (size - 2) + 'px';
+            } catch (e) {
+                console.error("Erro ao alterar tamanho da fonte:", e);
+            }
+        }
+
+        // Função para importar arquivo (chama o App Inventor)
+        function importFile() {
+            try {
+                callAppInventor('import', '');
+                showStatus("Selecione o arquivo no dispositivo");
+                toggleMenu();
+            } catch (e) {
+                console.error("Erro ao importar arquivo:", e);
+                showStatus("Erro ao importar", 3000);
+            }
+        }
+
+        // Função para exportar arquivo (chama o App Inventor)
         function exportFile() {
-            var items = JSON.parse(document.getElementById('items-data').value);
-            var content = items.map(item => item.question + '\t' + item.answer).join('\n');
-            
-            var blob = new Blob([content], { type: 'text/plain' });
-            var url = URL.createObjectURL(blob);
-            
-            document.getElementById('file-export').href = url;
-            document.getElementById('file-export').click();
-            
-            URL.revokeObjectURL(url);
-            toggleMenu();
-        }
-
-        function shuffleItems() {
-            var items = JSON.parse(document.getElementById('items-data').value);
-            
-            // Fisher-Yates shuffle algorithm
-            for (var i = items.length - 1; i > 0; i--) {
-                var j = Math.floor(Math.random() * (i + 1));
-                [items[i], items[j]] = [items[j], items[i]];
+            try {
+                var items = JSON.parse(document.getElementById('items-data').value);
+                var content = items.map(item => item.question + '\t' + item.answer).join('\n');
+                callAppInventor('export', content);
+                showStatus("Exportando arquivo...");
+                toggleMenu();
+            } catch (e) {
+                console.error("Erro ao exportar arquivo:", e);
+                showStatus("Erro ao exportar", 3000);
             }
-            
-            document.getElementById('items-data').value = JSON.stringify(items);
-            document.getElementById('current-index').value = 0;
-            updateDisplay();
-            toggleMenu();
         }
 
-        function resetOrder() {
-            var originalItems = document.getElementById('original-items').value;
-            if (originalItems && originalItems.trim() !== '') {
-                document.getElementById('items-data').value = originalItems;
+        // Função para processar conteúdo importado (chamada pelo App Inventor)
+        function processImportedContent(content) {
+            try {
+                parseFileContent(content);
+                showStatus("Arquivo importado com sucesso!");
+            } catch (e) {
+                console.error("Erro ao processar conteúdo:", e);
+                showStatus("Erro ao processar arquivo", 3000);
+            }
+        }
+
+        // Função para analisar conteúdo do arquivo
+        function parseFileContent(content) {
+            try {
+                var lines = content.split('\n');
+                var items = [];
+                
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i].trim();
+                    if (line === '') continue;
+                    
+                    var parts = line.split('\t');
+                    if (parts.length < 2) parts = line.split(';;');
+                    
+                    if (parts.length >= 2) {
+                        items.push({
+                            question: parts[0].trim(),
+                            answer: parts.slice(1).join('\t').trim()
+                        });
+                    }
+                }
+                
+                document.getElementById('items-data').value = JSON.stringify(items);
+                document.getElementById('original-items').value = JSON.stringify(items);
+                document.getElementById('current-index').value = 0;
+                updateDisplay();
+            } catch (e) {
+                console.error("Erro ao analisar arquivo:", e);
+                throw e;
+            }
+        }
+
+        // Função para baralhar perguntas
+        function shuffleItems() {
+            try {
+                var items = JSON.parse(document.getElementById('items-data').value);
+                
+                // Fisher-Yates shuffle algorithm
+                for (var i = items.length - 1; i > 0; i--) {
+                    var j = Math.floor(Math.random() * (i + 1));
+                    [items[i], items[j]] = [items[j], items[i]];
+                }
+                
+                document.getElementById('items-data').value = JSON.stringify(items);
                 document.getElementById('current-index').value = 0;
                 updateDisplay();
                 toggleMenu();
+                showStatus("Perguntas baralhadas");
+            } catch (e) {
+                console.error("Erro ao baralhar perguntas:", e);
+                showStatus("Erro ao baralhar", 3000);
             }
         }
 
-        function saveContent() {
-            var text = document.getElementById('content-editor').value;
-            var lines = text.split('\n');
-            var items = [];
-            
-            for (var i = 0; i < lines.length; i++) {
-                var line = lines[i].trim();
-                if (line === '') continue;
-                
-                var parts = line.split('\t');
-                if (parts.length < 2) parts = line.split(';;');
-                
-                if (parts.length >= 2) {
-                    items.push({
-                        question: parts[0].trim(),
-                        answer: parts.slice(1).join('\t').trim()
-                    });
+        // Função para repor ordem original
+        function resetOrder() {
+            try {
+                var originalItems = document.getElementById('original-items').value;
+                if (originalItems && originalItems.trim() !== '') {
+                    document.getElementById('items-data').value = originalItems;
+                    document.getElementById('current-index').value = 0;
+                    updateDisplay();
+                    toggleMenu();
+                    showStatus("Ordem original restaurada");
                 }
+            } catch (e) {
+                console.error("Erro ao repor ordem:", e);
+                showStatus("Erro ao repor ordem", 3000);
             }
-            
-            document.getElementById('items-data').value = JSON.stringify(items);
-            document.getElementById('original-items').value = JSON.stringify(items);
-            document.getElementById('current-index').value = 0;
-            updateDisplay();
-            toggleEditModal();
         }
 
-        // Event listeners
-        document.getElementById('menu-btn').addEventListener('click', toggleMenu);
-        document.getElementById('overlay').addEventListener('click', toggleMenu);
-        document.getElementById('prev-btn').addEventListener('click', prevItem);
-        document.getElementById('next-btn').addEventListener('click', nextItem);
-        document.getElementById('question').addEventListener('click', toggleAnswer);
-        document.getElementById('import-btn').addEventListener('click', function() {
-            document.getElementById('file-input').click();
+        // Função para salvar conteúdo editado
+        function saveContent() {
+            try {
+                var text = document.getElementById('content-editor').value;
+                var lines = text.split('\n');
+                var items = [];
+                
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i].trim();
+                    if (line === '') continue;
+                    
+                    var parts = line.split('\t');
+                    if (parts.length < 2) parts = line.split(';;');
+                    
+                    if (parts.length >= 2) {
+                        items.push({
+                            question: parts[0].trim(),
+                            answer: parts.slice(1).join('\t').trim()
+                        });
+                    }
+                }
+                
+                document.getElementById('items-data').value = JSON.stringify(items);
+                document.getElementById('original-items').value = JSON.stringify(items);
+                document.getElementById('current-index').value = 0;
+                updateDisplay();
+                toggleEditModal();
+                showStatus("Conteúdo guardado");
+            } catch (e) {
+                console.error("Erro ao guardar conteúdo:", e);
+                showStatus("Erro ao guardar", 3000);
+            }
+        }
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                // Inicializa os dados se estiverem vazios
+                var itemsData = document.getElementById('items-data');
+                if (!itemsData.value || itemsData.value.trim() === '') {
+                    itemsData.value = JSON.stringify([
+                        {question: "O que é HTML?", answer: "Linguagem de marcação para criar páginas web."},
+                        {question: "O que é CSS?", answer: "Linguagem para estilizar páginas web."}
+                    ]);
+                    document.getElementById('original-items').value = itemsData.value;
+                }
+                
+                // Atualiza a exibição inicial
+                updateDisplay();
+                
+                // Configura listeners de eventos
+                setupEventListeners();
+            } catch (e) {
+                console.error("Erro na inicialização:", e);
+            }
         });
-        document.getElementById('export-btn').addEventListener('click', exportFile);
-        document.getElementById('edit-btn').addEventListener('click', toggleEditModal);
-        document.getElementById('shuffle-btn').addEventListener('click', shuffleItems);
-        document.getElementById('reset-btn').addEventListener('click', resetOrder);
-        document.getElementById('jump-btn').addEventListener('click', jumpToQuestion);
-        document.getElementById('increase-font').addEventListener('click', function() {
-            changeFontSize(2);
-        });
-        document.getElementById('decrease-font').addEventListener('click', function() {
-            changeFontSize(-2);
-        });
-        document.getElementById('file-input').addEventListener('change', handleFileImport);
-        document.getElementById('cancel-edit').addEventListener('click', toggleEditModal);
-        document.getElementById('save-edit').addEventListener('click', saveContent);
+
+        // Configura todos os listeners de eventos
+        function setupEventListeners() {
+            try {
+                document.getElementById('menu-btn').addEventListener('click', toggleMenu);
+                document.getElementById('overlay').addEventListener('click', toggleMenu);
+                document.getElementById('prev-btn').addEventListener('click', prevItem);
+                document.getElementById('next-btn').addEventListener('click', nextItem);
+                document.getElementById('question').addEventListener('click', toggleAnswer);
+                document.getElementById('import-btn').addEventListener('click', importFile);
+                document.getElementById('export-btn').addEventListener('click', exportFile);
+                document.getElementById('edit-btn').addEventListener('click', toggleEditModal);
+                document.getElementById('shuffle-btn').addEventListener('click', shuffleItems);
+                document.getElementById('reset-btn').addEventListener('click', resetOrder);
+                document.getElementById('jump-btn').addEventListener('click', jumpToQuestion);
+                document.getElementById('increase-font').addEventListener('click', function() {
+                    changeFontSize(2);
+                });
+                document.getElementById('decrease-font').addEventListener('click', function() {
+                    changeFontSize(-2);
+                });
+                document.getElementById('cancel-edit').addEventListener('click', toggleEditModal);
+                document.getElementById('save-edit').addEventListener('click', saveContent);
+            } catch (e) {
+                console.error("Erro ao configurar listeners:", e);
+            }
+        }
     </script>
 </body>
 </html>
