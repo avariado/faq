@@ -591,11 +591,21 @@
 
             function saveContent() {
                 const text = contentEditor.value;
-                if (isQAMode) {
+                if (text.trim() === '') {
+                    alert('O conteúdo não pode estar vazio!');
+                    return;
+                }
+                
+                // Verifica se o conteúdo atual é Q&A ou texto simples
+                const hasTabs = text.includes('\t');
+                const hasDoubleSemicolon = text.includes(';;');
+                
+                if (hasTabs || hasDoubleSemicolon) {
                     parseQAContent(text);
                 } else {
                     parseTextContent(text);
                 }
+                
                 closeEditModal();
                 updateDisplay();
                 saveState();
@@ -638,13 +648,14 @@
                 
                 originalItems = [...items];
                 currentIndex = 0;
-                isQAMode = items[0] && items[0].hasOwnProperty('question');
+                isQAMode = items.length > 0 && items[0].hasOwnProperty('question');
                 saveState();
             }
 
             function parseTextContent(text) {
-                const sentences = text.split(/\.+/).map(s => s.trim()).filter(s => s !== '');
-                items = sentences.map(text => ({ text }));
+                // Divide por linhas não vazias, mantendo a estrutura original
+                const lines = text.split('\n').filter(line => line.trim() !== '');
+                items = lines.map(text => ({ text: text.trim() }));
                 originalItems = [...items];
                 currentIndex = 0;
                 isQAMode = false;
@@ -666,7 +677,8 @@
                     answerEl.textContent = currentItem.answer;
                     answerEl.classList.remove('visible');
                 } else {
-                    questionEl.textContent = currentItem.text + (currentItem.text.endsWith('.') ? '' : '.');
+                    questionEl.textContent = currentItem.text;
+                    answerEl.textContent = "";
                     answerEl.classList.remove('visible');
                 }
                 
