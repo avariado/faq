@@ -653,16 +653,45 @@
             }
 
             function parseTextContent(text) {
-                // Remove quebras de linha múltiplas e divide o texto em frases
-                const cleanedText = text.replace(/\n+/g, ' ').replace(/\s+/g, ' ');
+                // Remove quebras de linha múltiplas e espaços extras
+                const cleanedText = text.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
                 
-                // Expressão regular para dividir por . ! ? ou ... (mas mantendo os delimitadores)
+                // Expressão regular para dividir por . ! ? ou ... (mantendo os delimitadores)
                 const sentenceRegex = /[^.!?]+[.!?…]+/g;
                 const sentences = cleanedText.match(sentenceRegex) || [];
                 
-                items = sentences.map(sentence => ({ 
-                    text: sentence.trim() 
-                }));
+                // Processa as frases para garantir que tenham pelo menos 75 caracteres
+                let processedItems = [];
+                let currentSentence = '';
+                
+                for (const sentence of sentences) {
+                    const trimmedSentence = sentence.trim();
+                    
+                    // Se a frase atual + nova frase tiver menos de 75 caracteres, junta-as
+                    if ((currentSentence + ' ' + trimmedSentence).length < 75) {
+                        currentSentence = currentSentence ? currentSentence + ' ' + trimmedSentence : trimmedSentence;
+                    } else {
+                        // Se já temos uma frase acumulada, adiciona aos itens
+                        if (currentSentence) {
+                            processedItems.push({ text: currentSentence });
+                        }
+                        // Começa uma nova frase acumulada
+                        currentSentence = trimmedSentence;
+                    }
+                }
+                
+                // Adiciona a última frase acumulada (se houver)
+                if (currentSentence) {
+                    processedItems.push({ text: currentSentence });
+                }
+                
+                // Filtra frases muito curtas (menos de 75 caracteres)
+                items = processedItems.filter(item => item.text.length >= 75);
+                
+                // Se não houver frases com 75+ caracteres, usa as frases originais
+                if (items.length === 0) {
+                    items = sentences.map(sentence => ({ text: sentence.trim() }));
+                }
                 
                 originalItems = [...items];
                 currentIndex = 0;
