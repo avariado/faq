@@ -63,14 +63,16 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             padding: 30px;
             margin: 20px;
-            min-height: 300px;
-            max-height: 70vh;
             display: flex;
             flex-direction: column;
             position: relative;
             overflow: hidden;
             touch-action: pan-y;
             cursor: pointer;
+            /* Altura fixa responsiva */
+            height: 60vh;
+            min-height: 400px;
+            max-height: 600px;
         }
 
         #card-content {
@@ -79,6 +81,9 @@
             padding: 10px;
             position: relative;
             -webkit-overflow-scrolling: touch;
+            /* Garante que o conteúdo ocupa todo o espaço disponível */
+            display: flex;
+            flex-direction: column;
         }
 
         .card-footer {
@@ -86,6 +91,7 @@
             align-items: center;
             justify-content: space-between;
             margin-top: 15px;
+            flex-shrink: 0;
         }
 
         .nav-button {
@@ -116,6 +122,7 @@
             padding: 10px;
             border-radius: 5px;
             transition: background-color 0.2s;
+            flex-shrink: 0;
         }
 
         #question:hover {
@@ -131,6 +138,7 @@
             background-color: #f9f9f9;
             margin-top: 10px;
             display: none;
+            flex-shrink: 0;
         }
 
         #answer.visible {
@@ -334,7 +342,8 @@
                 font-size: 18px;
             }
             #card {
-                max-height: 65vh;
+                height: 65vh;
+                min-height: 300px;
                 padding: 15px;
             }
             .nav-button {
