@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Leitor Q&A</title>
     <style>
         * {
@@ -20,7 +20,9 @@
             display: flex;
             flex-direction: column;
             height: 100vh;
+            height: calc(var(--vh, 1vh) * 100);
             overflow: hidden;
+            padding-bottom: env(safe-area-inset-bottom);
         }
 
         header {
@@ -53,6 +55,7 @@
             padding: 20px;
             overflow: hidden;
             position: relative;
+            padding-bottom: env(safe-area-inset-bottom);
         }
 
         #card {
@@ -69,11 +72,7 @@
             overflow: hidden;
             touch-action: pan-y;
             cursor: pointer;
-            /* Altura fixa responsiva */
-            height: 60vh;
-            min-height: 400px;
-            max-height: 600px;
-            /* Garante borda visível em todos os dispositivos */
+            /* Altura ajustada dinamicamente via JS */
             border: 1px solid #e0e0e0;
         }
 
@@ -83,10 +82,8 @@
             padding: 10px;
             position: relative;
             -webkit-overflow-scrolling: touch;
-            /* Garante que o conteúdo ocupa todo o espaço disponível */
             display: flex;
             flex-direction: column;
-            /* Espaço para o rodapé */
             margin-bottom: 15px;
         }
 
@@ -94,12 +91,13 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-top: auto; /* Empurra o rodapé para baixo */
+            margin-top: auto;
             padding-top: 15px;
-            border-top: 1px solid #e0e0e0; /* Linha de separação */
+            border-top: 1px solid #e0e0e0;
             flex-shrink: 0;
         }
 
+        /* Restante do CSS permanece igual... */
         .nav-button {
             width: 36px;
             height: 36px;
@@ -348,8 +346,6 @@
                 font-size: 18px;
             }
             #card {
-                height: 65vh;
-                min-height: 300px;
                 padding: 15px;
                 margin: 10px;
             }
@@ -365,6 +361,7 @@
     </style>
 </head>
 <body>
+    <!-- O HTML permanece exatamente o mesmo -->
     <header>
         <button id="menu-btn">☰</button>
         <h1>Leitor Q&A</h1>
@@ -431,8 +428,31 @@
     <a id="file-export" download="perguntas_respostas.txt"></a>
 
     <script>
+        // Primeiro, ajustamos a altura da viewport para considerar a barra de navegação
+        function adjustViewport() {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+            
+            // Ajustamos a altura do card dinamicamente
+            const headerHeight = document.querySelector('header').offsetHeight;
+            const contentPadding = 40; // 20px top + 20px bottom
+            const cardFooterHeight = 60; // Altura aproximada do rodapé
+            const availableHeight = window.innerHeight - headerHeight - contentPadding;
+            
+            const card = document.getElementById('card');
+            card.style.height = `${availableHeight - cardFooterHeight}px`;
+            card.style.maxHeight = 'none'; // Removemos o max-height fixo
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
-            // Elementos DOM
+            // Ajuste inicial
+            adjustViewport();
+            
+            // Ajustamos quando a orientação muda ou a janela é redimensionada
+            window.addEventListener('resize', adjustViewport);
+            window.addEventListener('orientationchange', adjustViewport);
+
+            // Restante do código JavaScript permanece exatamente o mesmo...
             const menuBtn = document.getElementById('menu-btn');
             const menu = document.getElementById('menu');
             const overlay = document.getElementById('overlay');
