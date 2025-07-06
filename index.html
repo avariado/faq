@@ -347,6 +347,11 @@
             display: none;
         }
 
+        .search-label {
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
         #search-container {
             display: flex;
             flex-direction: column;
@@ -478,6 +483,7 @@
         <div class="menu-item">
             <i>🔍</i> Localizar Texto
             <div id="search-container">
+                <div class="search-label">Localizar Texto</div>
                 <input type="text" id="search-input" placeholder="Procurar...">
                 <div class="search-buttons">
                     <button id="search-prev-btn" class="search-btn" disabled>◄</button>
@@ -579,6 +585,9 @@
             increaseFontBtn.addEventListener('click', increaseFontSize);
             decreaseFontBtn.addEventListener('click', decreaseFontSize);
             fileInput.addEventListener('change', handleFileImport);
+            searchInput.addEventListener('input', function() {
+                searchNextBtn.disabled = searchInput.value.trim() === '';
+            });
             searchInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     performSearch();
