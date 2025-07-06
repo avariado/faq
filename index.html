@@ -147,20 +147,33 @@
             display: block;
         }
 
-        #counter {
-            text-align: center;
-            color: #666;
-            font-size: 16px;
-            padding: 8px 12px;
+        .counter-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
             background-color: rgba(0,0,0,0.03);
             border-radius: 20px;
-            margin: 0 10px;
-            cursor: pointer;
-            transition: background-color 0.2s;
+            padding: 5px 10px;
         }
 
-        #counter:hover {
-            background-color: rgba(0,0,0,0.1);
+        #current-card-input {
+            width: 40px;
+            text-align: center;
+            border: 1px solid transparent;
+            background: transparent;
+            font-size: 16px;
+            padding: 2px;
+            border-radius: 3px;
+        }
+
+        #current-card-input:focus {
+            border-color: #6200ee;
+            outline: none;
+            background: white;
+        }
+
+        #total-cards {
+            margin-left: 5px;
         }
 
         #card-content::-webkit-scrollbar {
@@ -292,16 +305,6 @@
             color: #333;
         }
 
-        #jump-to-input {
-            width: 60px;
-            padding: 8px;
-            margin: 0 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            text-align: center;
-            font-size: 16px;
-        }
-
         .font-size-controls {
             display: flex;
             align-items: center;
@@ -340,7 +343,7 @@
 
         #search-container {
             display: flex;
-            align-items: center;
+            flex-direction: column;
             margin-top: 10px;
             width: 100%;
         }
@@ -351,21 +354,40 @@
             border: 1px solid #ddd;
             border-radius: 5px;
             font-size: 14px;
+            margin-bottom: 5px;
         }
 
-        #search-btn {
-            margin-left: 10px;
-            padding: 8px 12px;
+        .search-buttons {
+            display: flex;
+            gap: 5px;
+        }
+
+        .search-btn {
+            flex: 1;
+            padding: 8px;
             background-color: #6200ee;
             color: white;
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            font-size: 14px;
+        }
+
+        .search-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
         }
 
         .highlight {
             background-color: yellow;
             color: black;
+        }
+
+        .search-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+            text-align: center;
         }
 
         @media (max-width: 600px) {
@@ -388,7 +410,7 @@
                 height: 32px;
                 font-size: 16px;
             }
-            #counter {
+            .counter-container {
                 font-size: 14px;
             }
         }
@@ -409,7 +431,10 @@
             
             <div class="card-footer">
                 <button id="prev-button" class="nav-button">◄</button>
-                <div id="counter">0 / 0</div>
+                <div class="counter-container">
+                    <input type="number" id="current-card-input" min="1">
+                    <span id="total-cards">/ 0</span>
+                </div>
                 <button id="next-button" class="nav-button">►</button>
             </div>
         </div>
@@ -443,7 +468,11 @@
             <i>🔍</i> Localizar Texto
             <div id="search-container">
                 <input type="text" id="search-input" placeholder="Procurar...">
-                <button id="search-btn">Buscar</button>
+                <div class="search-buttons">
+                    <button id="search-prev-btn" class="search-btn" disabled>Anterior</button>
+                    <button id="search-next-btn" class="search-btn" disabled>Próximo</button>
+                </div>
+                <div class="search-info" id="search-info"></div>
             </div>
         </div>
     </div>
@@ -489,7 +518,8 @@
             const cardContent = document.getElementById('card-content');
             const questionEl = document.getElementById('question');
             const answerEl = document.getElementById('answer');
-            const counterEl = document.getElementById('counter');
+            const currentCardInput = document.getElementById('current-card-input');
+            const totalCardsSpan = document.getElementById('total-cards');
             const editModal = document.getElementById('edit-modal');
             const contentEditor = document.getElementById('content-editor');
             const saveEditBtn = document.getElementById('save-edit');
@@ -507,7 +537,9 @@
             const prevButton = document.getElementById('prev-button');
             const nextButton = document.getElementById('next-button');
             const searchInput = document.getElementById('search-input');
-            const searchBtn = document.getElementById('search-btn');
+            const searchPrevBtn = document.getElementById('search-prev-btn');
+            const searchNextBtn = document.getElementById('search-next-btn');
+            const searchInfo = document.getElementById('search-info');
 
             let items = [];
             let originalItems = [];
@@ -536,24 +568,26 @@
             increaseFontBtn.addEventListener('click', increaseFontSize);
             decreaseFontBtn.addEventListener('click', decreaseFontSize);
             fileInput.addEventListener('change', handleFileImport);
-            searchBtn.addEventListener('click', performSearch);
             searchInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     performSearch();
                 }
             });
+            searchPrevBtn.addEventListener('click', goToPrevSearchResult);
+            searchNextBtn.addEventListener('click', goToNextSearchResult);
             
-            counterEl.addEventListener('click', function() {
-                const newIndex = prompt(`Introduza o número do cartão (1-${items.length}):`, currentIndex + 1);
-                if (newIndex !== null) {
-                    const num = parseInt(newIndex);
-                    if (num >= 1 && num <= items.length) {
-                        currentIndex = num - 1;
-                        updateDisplay();
-                        saveState();
-                    } else {
-                        alert(`Por favor, insira um número entre 1 e ${items.length}`);
-                    }
+            currentCardInput.addEventListener('focus', function() {
+                this.select();
+            });
+            
+            currentCardInput.addEventListener('blur', function() {
+                jumpToCard();
+            });
+            
+            currentCardInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    jumpToCard();
+                    this.blur();
                 }
             });
             
@@ -823,7 +857,8 @@
                 if (items.length === 0) {
                     questionEl.textContent = "Nenhum conteúdo carregado.";
                     answerEl.textContent = "";
-                    counterEl.textContent = "0 / 0";
+                    currentCardInput.value = "0";
+                    totalCardsSpan.textContent = "/ 0";
                     return;
                 }
 
@@ -839,13 +874,28 @@
                     answerEl.classList.remove('visible');
                 }
                 
-                counterEl.textContent = `${currentIndex + 1} / ${items.length}`;
+                currentCardInput.value = currentIndex + 1;
+                totalCardsSpan.textContent = `/ ${items.length}`;
                 
                 cardContent.scrollTop = 0;
                 
                 // Aplicar highlights se houver pesquisa ativa
                 if (searchTerm) {
                     highlightText();
+                }
+                
+                // Atualizar estado dos botões de navegação de pesquisa
+                updateSearchButtons();
+            }
+
+            function jumpToCard() {
+                const num = parseInt(currentCardInput.value);
+                if (num >= 1 && num <= items.length) {
+                    currentIndex = num - 1;
+                    updateDisplay();
+                    saveState();
+                } else {
+                    currentCardInput.value = currentIndex + 1;
                 }
             }
 
@@ -901,7 +951,8 @@
             function updateFontSize() {
                 questionEl.style.fontSize = `${baseFontSize}px`;
                 answerEl.style.fontSize = `${baseFontSize - 2}px`;
-                counterEl.style.fontSize = `${baseFontSize - 2}px`;
+                currentCardInput.style.fontSize = `${baseFontSize - 2}px`;
+                totalCardsSpan.style.fontSize = `${baseFontSize - 2}px`;
                 currentFontSizeEl.textContent = baseFontSize;
             }
 
@@ -989,7 +1040,10 @@
             
             function performSearch() {
                 searchTerm = searchInput.value.trim();
-                if (!searchTerm) return;
+                if (!searchTerm) {
+                    clearSearch();
+                    return;
+                }
                 
                 searchResults = [];
                 
@@ -1009,14 +1063,47 @@
                 }
                 
                 if (searchResults.length === 0) {
-                    alert('Nenhum resultado encontrado para: ' + searchTerm);
+                    searchInfo.textContent = 'Nenhum resultado encontrado para: ' + searchTerm;
+                    searchPrevBtn.disabled = true;
+                    searchNextBtn.disabled = true;
                     return;
                 }
                 
                 currentSearchIndex = 0;
                 currentIndex = searchResults[currentSearchIndex];
                 updateDisplay();
-                toggleMenu();
+                updateSearchInfo();
+            }
+            
+            function goToPrevSearchResult() {
+                if (searchResults.length === 0) return;
+                
+                currentSearchIndex = (currentSearchIndex - 1 + searchResults.length) % searchResults.length;
+                currentIndex = searchResults[currentSearchIndex];
+                updateDisplay();
+                updateSearchInfo();
+            }
+            
+            function goToNextSearchResult() {
+                if (searchResults.length === 0) return;
+                
+                currentSearchIndex = (currentSearchIndex + 1) % searchResults.length;
+                currentIndex = searchResults[currentSearchIndex];
+                updateDisplay();
+                updateSearchInfo();
+            }
+            
+            function updateSearchInfo() {
+                if (searchResults.length === 0) {
+                    searchInfo.textContent = '';
+                } else {
+                    searchInfo.textContent = `Resultado ${currentSearchIndex + 1} de ${searchResults.length}`;
+                }
+            }
+            
+            function updateSearchButtons() {
+                searchPrevBtn.disabled = searchResults.length === 0 || currentSearchIndex <= 0;
+                searchNextBtn.disabled = searchResults.length === 0 || currentSearchIndex >= searchResults.length - 1;
             }
             
             function highlightText() {
@@ -1035,6 +1122,16 @@
                 } else {
                     highlight(questionEl);
                 }
+            }
+            
+            function clearSearch() {
+                searchTerm = '';
+                searchResults = [];
+                currentSearchIndex = -1;
+                searchInfo.textContent = '';
+                searchPrevBtn.disabled = true;
+                searchNextBtn.disabled = true;
+                updateDisplay();
             }
         });
     </script>
