@@ -400,6 +400,12 @@
             color: black;
         }
 
+        .current-highlight {
+            background-color: orange;
+            color: black;
+            font-weight: bold;
+        }
+
         .search-info {
             font-size: 12px;
             color: #666;
@@ -591,6 +597,11 @@
             searchInput.addEventListener('input', function() {
                 const hasText = this.value.trim().length > 0;
                 searchNextBtn.disabled = !hasText;
+                searchPrevBtn.disabled = !hasText;
+                
+                if (!hasText) {
+                    clearSearch();
+                }
             });
             
             searchInput.addEventListener('keypress', function(e) {
@@ -1156,18 +1167,30 @@
             function highlightText() {
                 if (!searchTerm) return;
                 
-                const highlight = (element) => {
+                const highlight = (element, isCurrent) => {
                     const text = element.textContent;
                     const regex = new RegExp(searchTerm, 'gi');
-                    const newText = text.replace(regex, match => `<span class="highlight">${match}</span>`);
+                    
+                    let newText = text.replace(regex, match => {
+                        return `<span class="highlight">${match}</span>`;
+                    });
+                    
+                    // Se for o resultado atual, destacamos com uma classe diferente
+                    if (isCurrent) {
+                        newText = newText.replace(
+                            new RegExp(searchTerm, 'i'), 
+                            match => `<span class="current-highlight">${match}</span>`
+                        );
+                    }
+                    
                     element.innerHTML = newText;
                 };
                 
                 if (isQAMode) {
-                    highlight(questionEl);
-                    highlight(answerEl);
+                    highlight(questionEl, true);
+                    highlight(answerEl, true);
                 } else {
-                    highlight(questionEl);
+                    highlight(questionEl, true);
                 }
             }
             
