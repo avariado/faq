@@ -576,6 +576,7 @@
             let searchTerm = '';
             let searchResults = [];
             let currentSearchIndex = -1;
+            let isFirstSearchClick = true; // Nova variável para controlar o primeiro clique
 
             loadSampleData();
             updateDisplay();
@@ -610,8 +611,28 @@
                 }
             });
             
-            searchPrevBtn.addEventListener('click', goToPrevSearchResult);
-            searchNextBtn.addEventListener('click', goToNextSearchResult);
+            searchPrevBtn.addEventListener('click', function() {
+                if (isFirstSearchClick) {
+                    performSearch();
+                    isFirstSearchClick = false;
+                } else {
+                    goToPrevSearchResult();
+                }
+            });
+            
+            searchNextBtn.addEventListener('click', function() {
+                if (isFirstSearchClick) {
+                    performSearch();
+                    isFirstSearchClick = false;
+                } else {
+                    goToNextSearchResult();
+                }
+            });
+            
+            // Resetar a flag quando o input muda
+            searchInput.addEventListener('input', function() {
+                isFirstSearchClick = true;
+            });
             
             currentCardInput.addEventListener('focus', function() {
                 this.select();
@@ -904,7 +925,13 @@
                 if (isQAMode) {
                     questionEl.innerHTML = currentItem.question;
                     answerEl.innerHTML = currentItem.answer;
-                    answerEl.classList.remove('visible');
+                    
+                    // Mostra automaticamente a resposta se contiver o termo de pesquisa
+                    if (searchTerm && currentItem.answer.toLowerCase().includes(searchTerm.toLowerCase())) {
+                        answerEl.classList.add('visible');
+                    } else {
+                        answerEl.classList.remove('visible');
+                    }
                 } else {
                     questionEl.innerHTML = currentItem.text;
                     answerEl.textContent = "";
@@ -1201,6 +1228,7 @@
                 searchInfo.textContent = '';
                 searchPrevBtn.disabled = true;
                 searchNextBtn.disabled = true;
+                isFirstSearchClick = true;
                 updateDisplay();
             }
         });
