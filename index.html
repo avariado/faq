@@ -72,7 +72,6 @@
             overflow: hidden;
             touch-action: pan-y;
             cursor: pointer;
-            /* Altura ajustada dinamicamente via JS */
             border: 1px solid #e0e0e0;
         }
 
@@ -97,7 +96,6 @@
             flex-shrink: 0;
         }
 
-        /* Restante do CSS permanece igual... */
         .nav-button {
             width: 36px;
             height: 36px;
@@ -361,7 +359,6 @@
     </style>
 </head>
 <body>
-    <!-- O HTML permanece exatamente o mesmo -->
     <header>
         <button id="menu-btn">☰</button>
         <h1>Leitor Q&A</h1>
@@ -428,31 +425,25 @@
     <a id="file-export" download="perguntas_respostas.txt"></a>
 
     <script>
-        // Primeiro, ajustamos a altura da viewport para considerar a barra de navegação
         function adjustViewport() {
             const vh = window.innerHeight * 0.01;
             document.documentElement.style.setProperty('--vh', `${vh}px`);
             
-            // Ajustamos a altura do card dinamicamente
             const headerHeight = document.querySelector('header').offsetHeight;
-            const contentPadding = 40; // 20px top + 20px bottom
-            const cardFooterHeight = 60; // Altura aproximada do rodapé
+            const contentPadding = 40;
+            const cardFooterHeight = 60;
             const availableHeight = window.innerHeight - headerHeight - contentPadding;
             
             const card = document.getElementById('card');
             card.style.height = `${availableHeight - cardFooterHeight}px`;
-            card.style.maxHeight = 'none'; // Removemos o max-height fixo
+            card.style.maxHeight = 'none';
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            // Ajuste inicial
             adjustViewport();
-            
-            // Ajustamos quando a orientação muda ou a janela é redimensionada
             window.addEventListener('resize', adjustViewport);
             window.addEventListener('orientationchange', adjustViewport);
 
-            // Restante do código JavaScript permanece exatamente o mesmo...
             const menuBtn = document.getElementById('menu-btn');
             const menu = document.getElementById('menu');
             const overlay = document.getElementById('overlay');
@@ -480,7 +471,6 @@
             const prevButton = document.getElementById('prev-button');
             const nextButton = document.getElementById('next-button');
 
-            // Variáveis de estado
             let items = [];
             let originalItems = [];
             let currentIndex = 0;
@@ -489,12 +479,10 @@
             let touchStartX = 0;
             let touchStartY = 0;
 
-            // Inicialização
             loadSampleData();
             updateDisplay();
             updateFontSize();
 
-            // Event Listeners
             menuBtn.addEventListener('click', toggleMenu);
             overlay.addEventListener('click', toggleMenu);
             saveEditBtn.addEventListener('click', saveContent);
@@ -509,7 +497,6 @@
             decreaseFontBtn.addEventListener('click', decreaseFontSize);
             fileInput.addEventListener('change', handleFileImport);
             
-            // Navegação por botões
             prevButton.addEventListener('click', function(e) {
                 e.stopPropagation();
                 prevItem();
@@ -520,25 +507,21 @@
                 nextItem();
             });
             
-            // Clique no card para mostrar/ocultar resposta
             card.addEventListener('click', function(e) {
                 if (!e.target.classList.contains('nav-button') && isQAMode) {
                     answerEl.classList.toggle('visible');
                 }
             });
 
-            // Controle de touch - Versão Simplificada
             cardContent.addEventListener('touchstart', function(e) {
                 touchStartX = e.touches[0].clientX;
                 touchStartY = e.touches[0].clientY;
             }, { passive: true });
 
             cardContent.addEventListener('touchmove', function(e) {
-                // Permite todo movimento vertical (scroll)
                 const touchY = e.touches[0].clientY;
                 const diffY = Math.abs(touchY - touchStartY);
                 
-                // Apenas previne o comportamento padrão para swipes horizontais
                 const touchX = e.touches[0].clientX;
                 const diffX = Math.abs(touchX - touchStartX);
                 
@@ -553,7 +536,6 @@
                 const diffX = touchEndX - touchStartX;
                 const diffY = touchEndY - touchStartY;
 
-                // Verifica se foi um swipe horizontal (não vertical)
                 if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
                     if (diffX > 0) {
                         prevItem();
@@ -561,10 +543,8 @@
                         nextItem();
                     }
                 }
-                // Ignora completamente swipes verticais
             }, { passive: true });
 
-            // Prevenção de refresh apenas no body (fora do card)
             document.body.addEventListener('touchstart', function(e) {
                 if (e.target.closest('#card')) return;
                 touchStartY = e.touches[0].clientY;
@@ -577,20 +557,17 @@
                 }
             }, { passive: false });
 
-            // Navegação por teclado
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'ArrowLeft') {
                     prevItem();
                 } else if (e.key === 'ArrowRight') {
                     nextItem();
                 } else if (e.key === 'ArrowUp') {
-                    // Rolar para cima quando a barra de rolagem estiver visível
                     if (cardContent.scrollHeight > cardContent.clientHeight) {
                         e.preventDefault();
                         cardContent.scrollBy(0, -50);
                     }
                 } else if (e.key === 'ArrowDown') {
-                    // Rolar para baixo quando a barra de rolagem estiver visível
                     if (cardContent.scrollHeight > cardContent.clientHeight) {
                         e.preventDefault();
                         cardContent.scrollBy(0, 50);
@@ -632,7 +609,6 @@
                     return;
                 }
                 
-                // Verifica se o conteúdo atual é Q&A ou texto simples
                 const hasTabs = text.includes('\t');
                 const hasDoubleSemicolon = text.includes(';;');
                 
@@ -669,7 +645,6 @@
                 for (const line of lines) {
                     if (line.trim() === '') continue;
                     
-                    // Verifica primeiro por TAB, depois por ;;
                     const separator = line.includes('\t') ? '\t' : ';;';
                     const parts = line.split(separator);
                     
@@ -689,49 +664,47 @@
             }
 
             function parseTextContent(text) {
-                // Primeiro, substituímos quebras de linha por espaço, exceto quando seguido de pontuação
-                // Usamos uma expressão regular que captura quebras de linha seguidas de espaço em branco
-                // e remove o espaço apenas se não for seguido por pontuação
+                // Substitui quebras de linha por espaço, exceto antes de pontuação
                 let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
-                
-                // Depois removemos espaços múltiplos
                 cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
                 
-                // Dividir o texto em frases mantendo toda a pontuação
-                // Usamos uma abordagem mais simples que preserva todo o texto
-                // Dividimos em parágrafos lógicos baseados em comprimento
-                const chunkSize = 500; // Tamanho aproximado de cada "cartão"
-                const chunks = [];
+                // Divide em frases completas terminadas por .!?…
+                const sentenceRegex = /[^.!?]+[.!?…]+/g;
+                let sentences = cleanedText.match(sentenceRegex) || [];
+                sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
                 
-                // Se o texto for menor que o chunkSize, usamos ele inteiro
-                if (cleanedText.length <= chunkSize) {
-                    items = [{ text: cleanedText }];
-                } else {
-                    // Dividimos o texto em partes sem cortar palavras
-                    let start = 0;
-                    while (start < cleanedText.length) {
-                        // Encontra o próximo ponto de quebra ideal (espaço após chunkSize)
-                        let end = start + chunkSize;
-                        if (end >= cleanedText.length) {
-                            end = cleanedText.length;
-                        } else {
-                            // Encontra o próximo espaço após o chunkSize para não cortar palavras
-                            end = cleanedText.lastIndexOf(' ', end);
-                            if (end <= start) {
-                                // Se não encontrar espaço, vai até o próximo espaço
-                                end = cleanedText.indexOf(' ', start + chunkSize);
-                                if (end === -1) end = cleanedText.length;
-                            }
-                        }
-                        
-                        const chunk = cleanedText.substring(start, end).trim();
-                        if (chunk) chunks.push({ text: chunk });
-                        start = end;
+                // Processa frases para garantir tamanho mínimo
+                let processedItems = [];
+                let currentChunk = '';
+                
+                for (let i = 0; i < sentences.length; i++) {
+                    const sentence = sentences[i];
+                    
+                    // Se juntando com a próxima frase ainda ficar pequeno
+                    if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
+                        currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
+                        continue;
                     }
                     
-                    items = chunks;
+                    // Se já tem conteúdo acumulado ou a frase é grande o suficiente
+                    if (currentChunk || sentence.length >= 75) {
+                        processedItems.push({
+                            text: currentChunk ? currentChunk + ' ' + sentence : sentence
+                        });
+                        currentChunk = '';
+                    } 
+                    // Se a frase é pequena e é a última
+                    else if (i === sentences.length - 1 && processedItems.length > 0) {
+                        // Adiciona ao último item se for muito pequena
+                        processedItems[processedItems.length - 1].text += ' ' + sentence;
+                    }
+                    // Frase pequena isolada (permite exceção para não perder conteúdo)
+                    else {
+                        processedItems.push({ text: sentence });
+                    }
                 }
                 
+                items = processedItems;
                 originalItems = [...items];
                 currentIndex = 0;
                 isQAMode = false;
