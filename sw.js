@@ -1,5 +1,11 @@
 const CACHE_NAME = 'cache-v1';
-const urlsToCache = ['/', '/index.html', '/styles.css', '/script.js']; // ATUALIZA COM OS TEUS ARQUIVOS
+const urlsToCache = [
+  '/',
+  '/index.html',         
+  '/icon-192.png',
+  '/icon-512.png',
+  '/manifest.json'
+];
 
 // Instala o Service Worker e cacheia tudo
 self.addEventListener('install', (event) => {
