@@ -73,6 +73,8 @@
             height: 60vh;
             min-height: 400px;
             max-height: 600px;
+            /* Garante borda visível em todos os dispositivos */
+            border: 1px solid #e0e0e0;
         }
 
         #card-content {
@@ -84,13 +86,17 @@
             /* Garante que o conteúdo ocupa todo o espaço disponível */
             display: flex;
             flex-direction: column;
+            /* Espaço para o rodapé */
+            margin-bottom: 15px;
         }
 
         .card-footer {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-top: 15px;
+            margin-top: auto; /* Empurra o rodapé para baixo */
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0; /* Linha de separação */
             flex-shrink: 0;
         }
 
@@ -345,6 +351,7 @@
                 height: 65vh;
                 min-height: 300px;
                 padding: 15px;
+                margin: 10px;
             }
             .nav-button {
                 width: 32px;
