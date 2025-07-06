@@ -1235,5 +1235,12 @@
             }
         });
     </script>
+    <script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js')
+      .then(() => console.log('Service Worker CARREGADO COM SUCESSO, PORRA!'))
+      .catch((err) => console.log('DEU MERDA:', err));
+  }
+</script>
 </body>
 </html>
