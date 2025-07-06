@@ -347,31 +347,32 @@
             display: none;
         }
 
-        .search-label {
-            margin-bottom: 5px;
-            font-weight: bold;
+        .search-container-wrapper {
+            position: relative;
+            margin-top: 10px;
+            width: 100%;
         }
 
         #search-container {
             display: flex;
             flex-direction: column;
-            margin-top: 10px;
             width: 100%;
+            margin-top: 5px;
         }
 
         #search-input {
-            flex: 1;
+            width: 100%;
             padding: 8px;
             border: 1px solid #ddd;
             border-radius: 5px;
             font-size: 14px;
-            margin-bottom: 5px;
         }
 
         .search-buttons {
             display: flex;
             gap: 5px;
             justify-content: center;
+            margin-top: 5px;
         }
 
         .search-btn {
@@ -480,16 +481,17 @@
                 <button id="increase-font" class="font-size-btn">+</button>
             </div>
         </div>
-        <div class="menu-item">
+        <div class="menu-item" id="search-menu-item">
             <i>🔍</i> Localizar Texto
-            <div id="search-container">
-                <div class="search-label">Localizar Texto</div>
-                <input type="text" id="search-input" placeholder="Procurar...">
-                <div class="search-buttons">
-                    <button id="search-prev-btn" class="search-btn" disabled>◄</button>
-                    <button id="search-next-btn" class="search-btn" disabled>►</button>
+            <div class="search-container-wrapper">
+                <div id="search-container">
+                    <input type="text" id="search-input" placeholder="Procurar...">
+                    <div class="search-buttons">
+                        <button id="search-prev-btn" class="search-btn" disabled>◄</button>
+                        <button id="search-next-btn" class="search-btn" disabled>►</button>
+                    </div>
+                    <div class="search-info" id="search-info"></div>
                 </div>
-                <div class="search-info" id="search-info"></div>
             </div>
         </div>
     </div>
@@ -585,14 +587,18 @@
             increaseFontBtn.addEventListener('click', increaseFontSize);
             decreaseFontBtn.addEventListener('click', decreaseFontSize);
             fileInput.addEventListener('change', handleFileImport);
+            
             searchInput.addEventListener('input', function() {
-                searchNextBtn.disabled = searchInput.value.trim() === '';
+                const hasText = this.value.trim().length > 0;
+                searchNextBtn.disabled = !hasText;
             });
+            
             searchInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     performSearch();
                 }
             });
+            
             searchPrevBtn.addEventListener('click', goToPrevSearchResult);
             searchNextBtn.addEventListener('click', goToNextSearchResult);
             
