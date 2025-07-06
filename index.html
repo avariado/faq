@@ -154,26 +154,32 @@
             background-color: rgba(0,0,0,0.03);
             border-radius: 20px;
             padding: 5px 10px;
+            min-width: 80px;
         }
 
         #current-card-input {
-            width: 40px;
+            width: auto;
+            max-width: 50px;
             text-align: center;
             border: 1px solid transparent;
             background: transparent;
             font-size: 16px;
             padding: 2px;
             border-radius: 3px;
+            font-family: inherit;
         }
 
         #current-card-input:focus {
             border-color: #6200ee;
             outline: none;
             background: white;
+            min-width: 30px;
+            width: auto;
         }
 
         #total-cards {
             margin-left: 5px;
+            white-space: nowrap;
         }
 
         #card-content::-webkit-scrollbar {
@@ -360,17 +366,22 @@
         .search-buttons {
             display: flex;
             gap: 5px;
+            justify-content: center;
         }
 
         .search-btn {
-            flex: 1;
-            padding: 8px;
+            width: 30px;
+            height: 30px;
+            padding: 0;
             background-color: #6200ee;
             color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: 50%;
             cursor: pointer;
             font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .search-btn:disabled {
@@ -469,8 +480,8 @@
             <div id="search-container">
                 <input type="text" id="search-input" placeholder="Procurar...">
                 <div class="search-buttons">
-                    <button id="search-prev-btn" class="search-btn" disabled>Anterior</button>
-                    <button id="search-next-btn" class="search-btn" disabled>Próximo</button>
+                    <button id="search-prev-btn" class="search-btn" disabled>◄</button>
+                    <button id="search-next-btn" class="search-btn" disabled>►</button>
                 </div>
                 <div class="search-info" id="search-info"></div>
             </div>
@@ -877,6 +888,9 @@
                 currentCardInput.value = currentIndex + 1;
                 totalCardsSpan.textContent = `/ ${items.length}`;
                 
+                // Ajusta o tamanho do input para o conteúdo
+                adjustInputWidth();
+                
                 cardContent.scrollTop = 0;
                 
                 // Aplicar highlights se houver pesquisa ativa
@@ -888,6 +902,22 @@
                 updateSearchButtons();
             }
 
+            function adjustInputWidth() {
+                // Ajusta o tamanho do input para o conteúdo
+                const tempSpan = document.createElement('span');
+                tempSpan.style.visibility = 'hidden';
+                tempSpan.style.whiteSpace = 'nowrap';
+                tempSpan.style.fontSize = window.getComputedStyle(currentCardInput).fontSize;
+                tempSpan.style.fontFamily = window.getComputedStyle(currentCardInput).fontFamily;
+                tempSpan.textContent = currentCardInput.value;
+                document.body.appendChild(tempSpan);
+                
+                const width = tempSpan.offsetWidth + 10; // Adiciona um pouco de padding
+                currentCardInput.style.width = `${Math.max(width, 30)}px`;
+                
+                document.body.removeChild(tempSpan);
+            }
+
             function jumpToCard() {
                 const num = parseInt(currentCardInput.value);
                 if (num >= 1 && num <= items.length) {
@@ -896,6 +926,7 @@
                     saveState();
                 } else {
                     currentCardInput.value = currentIndex + 1;
+                    adjustInputWidth();
                 }
             }
 
@@ -954,6 +985,7 @@
                 currentCardInput.style.fontSize = `${baseFontSize - 2}px`;
                 totalCardsSpan.style.fontSize = `${baseFontSize - 2}px`;
                 currentFontSizeEl.textContent = baseFontSize;
+                adjustInputWidth();
             }
 
             function handleFileImport(e) {
