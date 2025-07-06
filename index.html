@@ -155,6 +155,12 @@
             background-color: rgba(0,0,0,0.03);
             border-radius: 20px;
             margin: 0 10px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        #counter:hover {
+            background-color: rgba(0,0,0,0.1);
         }
 
         #card-content::-webkit-scrollbar {
@@ -332,6 +338,36 @@
             display: none;
         }
 
+        #search-container {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+            width: 100%;
+        }
+
+        #search-input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        #search-btn {
+            margin-left: 10px;
+            padding: 8px 12px;
+            background-color: #6200ee;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .highlight {
+            background-color: yellow;
+            color: black;
+        }
+
         @media (max-width: 600px) {
             #menu {
                 width: 80%;
@@ -396,16 +432,18 @@
             <i>🔄</i> Voltar à Ordem Inicial
         </div>
         <div class="menu-item">
-            <i>🔢</i> Ir para Pergunta: 
-            <input type="number" id="jump-to-input" min="1">
-            <button id="jump-to-btn" class="btn btn-primary">Ir</button>
-        </div>
-        <div class="menu-item">
             <i>🔠</i> Tamanho da Fonte
             <div class="font-size-controls">
                 <button id="decrease-font" class="font-size-btn">-</button>
                 <span id="current-font-size">20</span>
                 <button id="increase-font" class="font-size-btn">+</button>
+            </div>
+        </div>
+        <div class="menu-item">
+            <i>🔍</i> Localizar Texto
+            <div id="search-container">
+                <input type="text" id="search-input" placeholder="Procurar...">
+                <button id="search-btn">Buscar</button>
             </div>
         </div>
     </div>
@@ -461,8 +499,6 @@
             const editContentBtn = document.getElementById('edit-content');
             const shuffleBtn = document.getElementById('shuffle');
             const resetOrderBtn = document.getElementById('reset-order');
-            const jumpToInput = document.getElementById('jump-to-input');
-            const jumpToBtn = document.getElementById('jump-to-btn');
             const increaseFontBtn = document.getElementById('increase-font');
             const decreaseFontBtn = document.getElementById('decrease-font');
             const currentFontSizeEl = document.getElementById('current-font-size');
@@ -470,6 +506,8 @@
             const fileExport = document.getElementById('file-export');
             const prevButton = document.getElementById('prev-button');
             const nextButton = document.getElementById('next-button');
+            const searchInput = document.getElementById('search-input');
+            const searchBtn = document.getElementById('search-btn');
 
             let items = [];
             let originalItems = [];
@@ -478,6 +516,9 @@
             let baseFontSize = 20;
             let touchStartX = 0;
             let touchStartY = 0;
+            let searchTerm = '';
+            let searchResults = [];
+            let currentSearchIndex = -1;
 
             loadSampleData();
             updateDisplay();
@@ -492,10 +533,29 @@
             editContentBtn.addEventListener('click', openEditModal);
             shuffleBtn.addEventListener('click', shuffleItems);
             resetOrderBtn.addEventListener('click', resetOrder);
-            jumpToBtn.addEventListener('click', jumpToQuestion);
             increaseFontBtn.addEventListener('click', increaseFontSize);
             decreaseFontBtn.addEventListener('click', decreaseFontSize);
             fileInput.addEventListener('change', handleFileImport);
+            searchBtn.addEventListener('click', performSearch);
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    performSearch();
+                }
+            });
+            
+            counterEl.addEventListener('click', function() {
+                const newIndex = prompt(`Introduza o número do cartão (1-${items.length}):`, currentIndex + 1);
+                if (newIndex !== null) {
+                    const num = parseInt(newIndex);
+                    if (num >= 1 && num <= items.length) {
+                        currentIndex = num - 1;
+                        updateDisplay();
+                        saveState();
+                    } else {
+                        alert(`Por favor, insira um número entre 1 e ${items.length}`);
+                    }
+                }
+            });
             
             prevButton.addEventListener('click', function(e) {
                 e.stopPropagation();
@@ -580,6 +640,10 @@
                     if (menu.classList.contains('active')) {
                         toggleMenu();
                     }
+                } else if (e.key === 'f' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    toggleMenu();
+                    searchInput.focus();
                 }
             });
 
@@ -611,9 +675,12 @@
                 
                 const hasTabs = text.includes('\t');
                 const hasDoubleSemicolon = text.includes(';;');
+                const isAlternatingLines = checkAlternatingLinesFormat(text);
                 
                 if (hasTabs || hasDoubleSemicolon) {
                     parseQAContent(text);
+                } else if (isAlternatingLines) {
+                    parseAlternatingLinesContent(text);
                 } else {
                     parseTextContent(text);
                 }
@@ -621,6 +688,26 @@
                 closeEditModal();
                 updateDisplay();
                 saveState();
+            }
+
+            function checkAlternatingLinesFormat(text) {
+                const lines = text.split('\n').filter(line => line.trim() !== '');
+                if (lines.length < 2) return false;
+                
+                // Verifica se cada linha contém apenas uma frase (não contém ponto final no meio)
+                for (const line of lines) {
+                    const trimmedLine = line.trim();
+                    // Se a linha tem um ponto final que não está no final, não é o formato alternado
+                    if (trimmedLine.split('.').length > 2 && !trimmedLine.endsWith('.')) {
+                        return false;
+                    }
+                    // Se a linha tem múltiplas frases separadas por pontos, não é o formato alternado
+                    if ((trimmedLine.match(/[.!?]/g) || []).length > 1) {
+                        return false;
+                    }
+                }
+                
+                return true;
             }
 
             function loadSampleData() {
@@ -660,6 +747,27 @@
                 originalItems = [...items];
                 currentIndex = 0;
                 isQAMode = items.length > 0 && items[0].hasOwnProperty('question');
+                saveState();
+            }
+
+            function parseAlternatingLinesContent(text) {
+                const lines = text.split('\n').filter(line => line.trim() !== '');
+                items = [];
+                originalItems = [];
+                
+                if (lines.length % 2 !== 0) {
+                    alert("Aviso: O número de linhas não é par. A última linha será ignorada.");
+                }
+                
+                for (let i = 0; i < lines.length - 1; i += 2) {
+                    const question = lines[i].trim();
+                    const answer = lines[i + 1].trim();
+                    items.push({ question, answer });
+                }
+                
+                originalItems = [...items];
+                currentIndex = 0;
+                isQAMode = true;
                 saveState();
             }
 
@@ -722,20 +830,23 @@
                 const currentItem = items[currentIndex];
                 
                 if (isQAMode) {
-                    questionEl.textContent = currentItem.question;
-                    answerEl.textContent = currentItem.answer;
+                    questionEl.innerHTML = currentItem.question;
+                    answerEl.innerHTML = currentItem.answer;
                     answerEl.classList.remove('visible');
                 } else {
-                    questionEl.textContent = currentItem.text;
+                    questionEl.innerHTML = currentItem.text;
                     answerEl.textContent = "";
                     answerEl.classList.remove('visible');
                 }
                 
                 counterEl.textContent = `${currentIndex + 1} / ${items.length}`;
-                jumpToInput.value = currentIndex + 1;
-                jumpToInput.max = items.length;
                 
                 cardContent.scrollTop = 0;
+                
+                // Aplicar highlights se houver pesquisa ativa
+                if (searchTerm) {
+                    highlightText();
+                }
             }
 
             function nextItem() {
@@ -773,16 +884,6 @@
                 updateDisplay();
                 toggleMenu();
                 saveState();
-            }
-
-            function jumpToQuestion() {
-                const num = parseInt(jumpToInput.value);
-                if (num >= 1 && num <= items.length) {
-                    currentIndex = num - 1;
-                    updateDisplay();
-                    saveState();
-                }
-                toggleMenu();
             }
 
             function increaseFontSize() {
@@ -829,9 +930,12 @@
                         
                         const hasTabs = contentString.includes('\t');
                         const hasDoubleSemicolon = contentString.includes(';;');
+                        const isAlternatingLines = checkAlternatingLinesFormat(contentString);
                         
                         if (hasTabs || hasDoubleSemicolon) {
                             parseQAContent(contentString);
+                        } else if (isAlternatingLines) {
+                            parseAlternatingLinesContent(contentString);
                         } else {
                             parseTextContent(contentString);
                         }
@@ -881,6 +985,56 @@
             function loadState() {
                 const savedState = localStorage.getItem('appState');
                 return savedState ? JSON.parse(savedState) : null;
+            }
+            
+            function performSearch() {
+                searchTerm = searchInput.value.trim();
+                if (!searchTerm) return;
+                
+                searchResults = [];
+                
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i];
+                    let textToSearch = '';
+                    
+                    if (isQAMode) {
+                        textToSearch = item.question + ' ' + item.answer;
+                    } else {
+                        textToSearch = item.text;
+                    }
+                    
+                    if (textToSearch.toLowerCase().includes(searchTerm.toLowerCase())) {
+                        searchResults.push(i);
+                    }
+                }
+                
+                if (searchResults.length === 0) {
+                    alert('Nenhum resultado encontrado para: ' + searchTerm);
+                    return;
+                }
+                
+                currentSearchIndex = 0;
+                currentIndex = searchResults[currentSearchIndex];
+                updateDisplay();
+                toggleMenu();
+            }
+            
+            function highlightText() {
+                if (!searchTerm) return;
+                
+                const highlight = (element) => {
+                    const text = element.textContent;
+                    const regex = new RegExp(searchTerm, 'gi');
+                    const newText = text.replace(regex, match => `<span class="highlight">${match}</span>`);
+                    element.innerHTML = newText;
+                };
+                
+                if (isQAMode) {
+                    highlight(questionEl);
+                    highlight(answerEl);
+                } else {
+                    highlight(questionEl);
+                }
             }
         });
     </script>
