@@ -689,8 +689,13 @@
             }
 
             function parseTextContent(text) {
-                // Remove quebras de linha múltiplas e espaços extras
-                const cleanedText = text.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+                // Primeiro, substituímos quebras de linha por espaço, exceto quando seguido de pontuação
+                // Usamos uma expressão regular que captura quebras de linha seguidas de espaço em branco
+                // e remove o espaço apenas se não for seguido por pontuação
+                let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
+                
+                // Depois removemos espaços múltiplos
+                cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
                 
                 // Expressão regular para dividir por . ! ? ou ... (mantendo os delimitadores)
                 const sentenceRegex = /[^.!?]+[.!?…]+/g;
