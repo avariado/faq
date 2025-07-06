@@ -697,41 +697,39 @@
                 // Depois removemos espaços múltiplos
                 cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
                 
-                // Expressão regular para dividir por . ! ? ou ... (mantendo os delimitadores)
-                const sentenceRegex = /[^.!?]+[.!?…]+/g;
-                const sentences = cleanedText.match(sentenceRegex) || [];
+                // Dividir o texto em frases mantendo toda a pontuação
+                // Usamos uma abordagem mais simples que preserva todo o texto
+                // Dividimos em parágrafos lógicos baseados em comprimento
+                const chunkSize = 500; // Tamanho aproximado de cada "cartão"
+                const chunks = [];
                 
-                // Processa as frases para garantir que tenham pelo menos 75 caracteres
-                let processedItems = [];
-                let currentSentence = '';
-                
-                for (const sentence of sentences) {
-                    const trimmedSentence = sentence.trim();
-                    
-                    // Se a frase atual + nova frase tiver menos de 75 caracteres, junta-as
-                    if ((currentSentence + ' ' + trimmedSentence).length < 75) {
-                        currentSentence = currentSentence ? currentSentence + ' ' + trimmedSentence : trimmedSentence;
-                    } else {
-                        // Se já temos uma frase acumulada, adiciona aos itens
-                        if (currentSentence) {
-                            processedItems.push({ text: currentSentence });
+                // Se o texto for menor que o chunkSize, usamos ele inteiro
+                if (cleanedText.length <= chunkSize) {
+                    items = [{ text: cleanedText }];
+                } else {
+                    // Dividimos o texto em partes sem cortar palavras
+                    let start = 0;
+                    while (start < cleanedText.length) {
+                        // Encontra o próximo ponto de quebra ideal (espaço após chunkSize)
+                        let end = start + chunkSize;
+                        if (end >= cleanedText.length) {
+                            end = cleanedText.length;
+                        } else {
+                            // Encontra o próximo espaço após o chunkSize para não cortar palavras
+                            end = cleanedText.lastIndexOf(' ', end);
+                            if (end <= start) {
+                                // Se não encontrar espaço, vai até o próximo espaço
+                                end = cleanedText.indexOf(' ', start + chunkSize);
+                                if (end === -1) end = cleanedText.length;
+                            }
                         }
-                        // Começa uma nova frase acumulada
-                        currentSentence = trimmedSentence;
+                        
+                        const chunk = cleanedText.substring(start, end).trim();
+                        if (chunk) chunks.push({ text: chunk });
+                        start = end;
                     }
-                }
-                
-                // Adiciona a última frase acumulada (se houver)
-                if (currentSentence) {
-                    processedItems.push({ text: currentSentence });
-                }
-                
-                // Filtra frases muito curtas (menos de 75 caracteres)
-                items = processedItems.filter(item => item.text.length >= 75);
-                
-                // Se não houver frases com 75+ caracteres, usa as frases originais
-                if (items.length === 0) {
-                    items = sentences.map(sentence => ({ text: sentence.trim() }));
+                    
+                    items = chunks;
                 }
                 
                 originalItems = [...items];
