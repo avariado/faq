@@ -1236,11 +1236,11 @@
         });
     </script>
     <script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/docs/sw.js')
-      .then(() => console.log('Service Worker CARREGADO COM SUCESSO!'))
-      .catch((err) => console.log('ERRO:', err));
-  }
-</script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/docs/sw.js')
+          .then(() => console.log('Service Worker CARREGADO COM SUCESSO!'))
+          .catch((err) => console.log('ERRO:', err));
+      }
+    </script>
 </body>
 </html>
