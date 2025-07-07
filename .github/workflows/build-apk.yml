@@ -1,4 +1,4 @@
-name: Build PWA APK - Solução Definitiva
+name: Build PWA APK - Solução Garantida
 
 on:
   workflow_dispatch:
@@ -12,22 +12,46 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
     - name: Setup Java and Android
       uses: android-actions/setup-android@v3
 
-    - name: Install Bubblewrap
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y curl git
+        curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+        sudo apt-get install -y nodejs
+        npm install -g npm@latest
+
+    - name: Install Bubblewrap (Approach 1)
+      id: bubblewrap
+      continue-on-error: true
       run: |
         npm install -g @bubblewrap/cli@1.19.0 --no-fund --no-audit --silent
         mkdir -p ~/.bubblewrap
         echo '{"analyticsEnabled": false, "nonInteractive": true}' > ~/.bubblewrap/config.json
 
+    - name: Install Bubblewrap (Approach 2 - Fallback)
+      if: steps.bubblewrap.outcome == 'failure'
+      run: |
+        sudo npm install -g @bubblewrap/cli@1.19.0 --no-fund --no-audit --unsafe-perm
+        mkdir -p ~/.bubblewrap
+        echo '{"analyticsEnabled": false, "nonInteractive": true}' > ~/.bubblewrap/config.json
+
+    - name: Verify Installation
+      run: |
+        bubblewrap --version || (echo "::error::Bubblewrap installation failed" && exit 1)
+
     - name: Generate APK
       run: |
-        # Cria diretório temporário
-        mkdir -p ./pwa-temp
-        cd ./pwa-temp
+        mkdir -p ./pwa-output
+        cd ./pwa-output
         
-        # Comando DIRETO sem arquivos de configuração
         bubblewrap init \
           --manifest="https://avariado.github.io/faq/manifest.json" \
           --packageId="com.pwa.faq" \
@@ -40,21 +64,17 @@ jobs:
           --default \
           --non-interactive
         
-        # Build do APK (modo silencioso)
         bubblewrap build \
           --skipPwaValidation \
           --skipVersionCheck \
-          --skipSigning > /dev/null 2>&1
-        
-        # Verifica e move o APK
+          --skipSigning
+
         if [ -f "app-release-unsigned.apk" ]; then
           mv app-release-unsigned.apk ../pwa-app.apk
-          echo "✅ APK gerado com sucesso!"
+          echo "✅ APK generated successfully!"
           ls -lh ../pwa-app.apk
         else
-          echo "::error::❌ Falha crítica - APK não gerado"
-          echo "Últimos logs:"
-          cat ~/.bubblewrap/logs/*
+          echo "::error::❌ Critical failure - APK not generated"
           exit 1
         fi
 
