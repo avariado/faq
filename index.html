@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
-    <link rel="manifest" href="/docs/manifest.json">
+    <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#000000">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -1237,7 +1237,7 @@
     </script>
     <script>
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/docs/sw.js')
+        navigator.serviceWorker.register('/sw.js')
           .then(() => console.log('Service Worker CARREGADO COM SUCESSO!'))
           .catch((err) => console.log('ERRO:', err));
       }
