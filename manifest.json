@@ -4,7 +4,8 @@
   "description": "App do meu site GitHub",
   "id": "/",
   "start_url": "/faq/",
-  "display": "standalone",
+  "display": "fullscreen",
+  "scope": "/faq/",
   "background_color": "#000000",
   "theme_color": "#420420",
   "icons": [
