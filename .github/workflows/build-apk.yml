@@ -1,0 +1,31 @@
+name: Build PWA APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
+
+    - name: Build APK with PWABuilder
+      run: |
+        npm install -g @pwabuilder/pwabuilder
+        pwabuilder https://seu-usuario.github.io/faq/ -p android -l debug
+        mv platforms/android/app/build/outputs/apk/debug/*.apk ./pwa-app.apk
+
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: pwa-apk
+        path: pwa-app.apk
