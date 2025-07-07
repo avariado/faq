@@ -7,7 +7,8 @@
   "display": "standalone",
   "scope": "/faq/",
   "background_color": "#000000",
-  "theme_color": "#420420",
+  "display_override": ["standalone", "minimal-ui"],
+  "theme_color": "#6200ee",
   "icons": [
     {
       "src": "/faq/icon-192x192.png",
