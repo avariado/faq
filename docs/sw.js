@@ -2,8 +2,8 @@ const CACHE_NAME = 'cache-v1';
 const urlsToCache = [
   '/docs/',
   '/docs/index.html',         
-  '/docs/icon-192.png',
-  '/docs/icon-512.png',
+  '/docs/icon-192x192.png',
+  '/docs/icon-512x512.png',
   '/docs/manifest.json'
 ];
 
