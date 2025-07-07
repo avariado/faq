@@ -3,32 +3,37 @@ name: Build PWA APK
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-    - name: Setup Java (requerido pelo Bubblewrap)
+    - name: Setup Java
       uses: actions/setup-java@v3
       with:
         distribution: 'zulu'
         java-version: '11'
 
-    - name: Build APK with Bubblewrap (método direto)
+    - name: Install Bubblewrap
       run: |
-        # Instalação limpa do Bubblewrap
         npm install -g @bubblewrap/cli --no-package-lock --no-save
-        
-        # Geração direta do APK (sem init)
-        bubblewrap build --manifest=https://${{ github.repository_owner }}.github.io/faq/manifest.json
-        
-        # Verificação do arquivo gerado
-        ls -lh ./app-release.apk || echo "::error::APK não foi gerado"
+        bubblewrap --version
 
-    - uses: actions/upload-artifact@v3
+    - name: Build APK
+      run: |
+        bubblewrap build --manifest=https://${{ github.repository_owner }}.github.io/faq/manifest.json
+        ls -lh ./app-release.apk
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
       with:
         name: pwa-apk
         path: app-release.apk
+        retention-days: 1
