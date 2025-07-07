@@ -18,45 +18,41 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
-        cache: 'npm'
-
-    - name: Create minimal package.json
+        
+    - name: Create package structure
       run: |
+        # Cria package.json mínimo
         echo '{
           "name": "pwa-builder",
           "version": "1.0.0",
           "private": true,
-          "dependencies": {}
+          "dependencies": {
+            "@bubblewrap/cli": "^1.0.0"
+          }
         }' > package.json
-        npm install @bubblewrap/cli --save-dev
+        
+        # Gera lock file
+        npm install --package-lock-only
+        
+        # Lista arquivos para verificação
+        ls -la
 
-    - name: Verify manifest access
-      run: |
-        curl -s https://${{ github.repository_owner }}.github.io/faq/manifest.json > manifest.json
-        if [ ! -s manifest.json ]; then
-          echo "::error::Manifest não encontrado ou vazio!"
-          exit 1
-        fi
+    - name: Install Bubblewrap
+      run: npm install
 
     - name: Generate APK
       run: |
         npx bubblewrap init --manifest=https://${{ github.repository_owner }}.github.io/faq/manifest.json
         npx bubblewrap build
-        ls -la ./app-release.apk || echo "::warning::APK não gerado!"
-
-    - name: Rename and upload APK
-      run: |
-        if [ -f "./app-release.apk" ]; then
-          mv ./app-release.apk ./pwa-app.apk
-          echo "APK renomeado com sucesso!"
-        else
-          echo "::error::Arquivo APK não encontrado!"
+        
+        # Verifica se o APK foi gerado
+        if [ ! -f "./app-release.apk" ]; then
+          echo "::error::Falha ao gerar APK"
           exit 1
         fi
 
-    - name: Upload APK artifact
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: pwa-apk
-        path: pwa-app.apk
-        if-no-files-found: error
+        path: app-release.apk
