@@ -1,8 +1,0 @@
-{
-  "display": "standalone",
-  "startUrl": "/faq/?source=twa",
-  "enableNotifications": true,
-  "navigationColor": "#6200ee",
-  "navigationBarColor": "#000000",
-  "navigationDividerColor": "#000000"
-}
