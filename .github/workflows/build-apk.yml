@@ -1,4 +1,4 @@
-name: Build PWA APK - Solução Final 2025
+name: Build PWA APK - Solução Definitiva Funcional
 
 on:
   workflow_dispatch:
@@ -18,9 +18,9 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Install Android SDK (Non-Interactive)
+    - name: Install Android SDK (Correct Way)
       run: |
-        # Cria estrutura EXATA que o Android SDK requer
+        # Estrutura exata que o Android SDK requer
         mkdir -p ~/android-sdk/cmdline-tools/latest
         wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
         unzip -q cmdline-tools.zip -d ~/android-sdk/cmdline-tools/latest
@@ -31,72 +31,69 @@ jobs:
         echo "PATH=$HOME/android-sdk/cmdline-tools/latest/bin:$HOME/android-sdk/platform-tools:$PATH" >> $GITHUB_ENV
         
         # Aceita licenças automaticamente
-        yes | ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME --licenses >/dev/null 2>&1
+        yes | ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME --licenses >/dev/null
         
-        # Instala pacotes essenciais
+        # Instala pacotes necessários
         ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME \
           "platform-tools" \
           "platforms;android-34" \
-          "build-tools;34.0.0" \
-          "cmdline-tools;latest"
+          "build-tools;34.0.0"
 
-    - name: Install Bubblewrap (Forced Non-Interactive)
+    - name: Install Bubblewrap (No Questions Asked)
       run: |
-        # Instala sem perguntas
-        npm_config_yes=true npm install -g @bubblewrap/cli@latest --no-fund --no-audit --silent
-        
-        # Configura para nunca perguntar nada
+        npm install -g @bubblewrap/cli@1.9.0 --no-fund --no-audit --silent
         mkdir -p ~/.bubblewrap
-        echo '{
-          "analyticsEnabled": false,
-          "collectMetrics": false,
-          "enableExperimental": true,
-          "nonInteractive": true
-        }' > ~/.bubblewrap/config.json
+        echo '{"analyticsEnabled": false, "nonInteractive": true}' > ~/.bubblewrap/config.json
 
-    - name: Generate Config Automatically
+    - name: Prepare Build Environment
       run: |
-        # Cria um arquivo de configuração pré-definido
         mkdir -p ./pwa-build
-        cat > ./pwa-build/config.json <<EOL
+        # Cria um arquivo de configuração completo
+        cat > ./pwa-build/input-config.json <<EOL
         {
           "manifest": "https://${{ github.repository_owner }}.github.io/faq/manifest.json",
-          "host": "avariado.github.io",
+          "host": "${{ github.repository_owner }}.github.io",
           "path": "/faq/",
-          "jdkPath": "$JAVA_HOME",
-          "androidSdkPath": "$ANDROID_HOME",
           "packageId": "com.pwa.faq",
           "appVersionName": "1.0.0",
           "appVersionCode": 1,
           "enableNotifications": false,
-          "launcherName": "FAQ PWA",
-          "display": "standalone"
+          "display": "standalone",
+          "jdkPath": "$JAVA_HOME",
+          "androidSdkPath": "$ANDROID_HOME"
         }
         EOL
 
-    - name: Build APK (100% Non-Interactive)
+    - name: Build APK (Forced Mode)
       run: |
         cd ./pwa-build
         
-        # Gera projeto sem perguntas usando config pré-definida
-        bubblewrap init --config=config.json --default --non-interactive
+        # Comando completo com todos os parâmetros necessários
+        bubblewrap init \
+          --manifest=https://${{ github.repository_owner }}.github.io/faq/manifest.json \
+          --jdkPath=$JAVA_HOME \
+          --androidSdkPath=$ANDROID_HOME \
+          --default \
+          --nonInteractive=true \
+          --host=${{ github.repository_owner }}.github.io \
+          --path=/faq/ \
+          --packageId=com.pwa.faq
         
         # Build com todas as validações desligadas
         bubblewrap build \
           --skipPwaValidation \
           --skipVersionCheck \
-          --skipSigning \
-          --non-interactive
+          --skipSigning
         
         if [ -f "app-release-unsigned.apk" ]; then
           mv app-release-unsigned.apk ../pwa-app.apk
           echo "✅ APK gerado com sucesso!"
           ls -lh ../pwa-app.apk
         else
-          echo "::error::❌ Falha crítica na geração do APK"
-          echo "=== DEBUG INFORMATION ==="
-          bubblewrap doctor --verbose
+          echo "::error::❌ Falha na geração do APK"
+          echo "=== DEBUG INFO ==="
           ls -la
+          bubblewrap doctor --verbose
           exit 1
         fi
 
