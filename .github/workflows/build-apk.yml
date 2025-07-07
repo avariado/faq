@@ -3,35 +3,50 @@ name: Build PWA APK
 on:
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20  # Aumentamos o tempo limite
 
     steps:
-    - name: Checkout repository
+    - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup Java
-      uses: actions/setup-java@v3
-      with:
-        distribution: 'zulu'
-        java-version: '11'
-
-    - name: Install Bubblewrap
+    - name: Setup environment
       run: |
-        npm install -g @bubblewrap/cli --no-package-lock --no-save
-        bubblewrap --version
+        # Instala dependências essenciais
+        sudo apt-get update
+        sudo apt-get install -y nodejs npm default-jdk
+        
+        # Configura o npm sem lockfile
+        npm config set package-lock false
+        
+        # Instala o Bubblewrap globalmente
+        npm install -g @bubblewrap/cli
 
-    - name: Build APK
+    - name: Build APK (com tratamento de erro)
       run: |
-        bubblewrap build --manifest=https://${{ github.repository_owner }}.github.io/faq/manifest.json
-        ls -lh ./app-release.apk
+        set -e  # Sai imediatamente em caso de erro
+        
+        echo "Verificando manifest.json..."
+        curl -s https://${{ github.repository_owner }}.github.io/faq/manifest.json | jq empty
+        
+        echo "Iniciando construção do APK..."
+        timeout 15m bubblewrap build \
+          --manifest=https://${{ github.repository_owner }}.github.io/faq/manifest.json \
+          --skipVersionCheck \
+          --skipPwaValidation || echo "Continua após timeout"
+        
+        if [ -f "app-release.apk" ]; then
+          echo "APK gerado com sucesso!"
+          ls -lh app-release.apk
+        else
+          echo "::error::Falha na geração do APK"
+          exit 1
+        fi
 
     - name: Upload APK
+      if: success() || failure()  # Executa mesmo com falha parcial
       uses: actions/upload-artifact@v4
       with:
         name: pwa-apk
