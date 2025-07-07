@@ -11,19 +11,18 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4  # Atualizado para v4
 
     - name: Set up Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4  # Atualizado para v4
       with:
-        node-version: 18
+        node-version: 20  # Versão mais recente do Node
 
     - name: Install dependencies
       run: |
-        npm install -g @pwabuilder/pwabuilder
         npm install -g @bubblewrap/cli
 
-    - name: Generate APK with Bubblewrap (recomendado)
+    - name: Generate APK with Bubblewrap
       run: |
         bubblewrap init --manifest=https://${{ github.repository_owner }}.github.io/faq/manifest.json --directory=./pwa-build
         cd pwa-build
@@ -31,7 +30,7 @@ jobs:
         mv ./app-release.apk ../pwa-app.apk
 
     - name: Upload APK
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4  # Atualizado para v4
       with:
         name: pwa-apk
         path: pwa-app.apk
