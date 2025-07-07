@@ -2,6 +2,7 @@
   "name": "Leitor Q&A",
   "short_name": "FAQ",
   "description": "App do meu site GitHub",
+  "id": "/",
   "start_url": "/docs/",
   "display": "standalone",
   "background_color": "#000000",
