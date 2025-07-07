@@ -18,16 +18,18 @@ jobs:
         distribution: 'zulu'
         java-version: '17'
 
-    - name: Install Bubblewrap (sem interação)
+    - name: Install Bubblewrap (non-interactive)
       run: |
         npm install -g @bubblewrap/cli
-        echo -e "y\ny" | bubblewrap --version  # Responde automaticamente aos prompts
+        # Verifica a versão sem prompts
+        bubblewrap --version
 
-    - name: Build APK (modo não interativo)
+    - name: Build APK (non-interactive mode)
       run: |
         mkdir -p ./pwa-build
         cd ./pwa-build
-        echo -e "y\nn" | bubblewrap init --manifest=https://${{ github.repository_owner }}.github.io/faq/manifest.json
+        # Responde automaticamente a todos os prompts: Y para JDK, Y para Android SDK
+        yes | bubblewrap init --manifest=https://${{ github.repository_owner }}.github.io/faq/manifest.json
         bubblewrap build --skipPwaValidation --skipVersionCheck
         
         if [ -f "app-release.apk" ]; then
