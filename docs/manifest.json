@@ -5,6 +5,10 @@
   "id": "/",
   "start_url": "/docs/",
   "display": "standalone",
+  "launch_handler": {
+  "client_mode": "navigate-existing"
+},
+  "iarc_rating_id": "e84b072d",
   "background_color": "#000000",
   "theme_color": "#420420",
   "icons": [
