@@ -21,7 +21,7 @@ jobs:
     - name: Build APK with PWABuilder
       run: |
         npm install -g @pwabuilder/pwabuilder
-        pwabuilder https://seu-usuario.github.io/faq/ -p android -l debug
+        pwabuilder https://avariado.github.io/faq/ -p android -l debug
         mv platforms/android/app/build/outputs/apk/debug/*.apk ./pwa-app.apk
 
     - name: Upload APK artifact
