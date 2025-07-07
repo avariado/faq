@@ -1,4 +1,4 @@
-name: Build PWA APK
+name: Build PWA APK Nuclear Option
 
 on:
   workflow_dispatch:
@@ -12,52 +12,72 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup Java (JDK 17)
-      uses: actions/setup-java@v3
-      with:
-        distribution: 'zulu'
-        java-version: '17'
-
-    - name: Install Android Command Line Tools
+    - name: Setup Environment
       run: |
+        # Instala todas as dependências necessárias
+        sudo apt-get update
+        sudo apt-get install -y wget unzip zip
+        
+        # JDK 17 (Zulu)
+        wget -qO - https://apt.corretto.aws/corretto.key | sudo apt-key add - 
+        sudo add-apt-repository 'deb https://apt.corretto.aws stable main'
+        sudo apt-get update
+        sudo apt-get install -y zulu17-jdk
+        
+        # Android SDK
         mkdir -p ~/android-sdk/cmdline-tools
-        wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
-        unzip cmdline-tools.zip -d ~/android-sdk/cmdline-tools
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
+        unzip -q cmdline-tools.zip -d ~/android-sdk/cmdline-tools
         mv ~/android-sdk/cmdline-tools/cmdline-tools ~/android-sdk/cmdline-tools/latest
-        echo "ANDROID_HOME=~/android-sdk" >> $GITHUB_ENV
-        echo "PATH=~/android-sdk/cmdline-tools/latest/bin:~/android-sdk/platform-tools:$PATH" >> $GITHUB_ENV
-
-    - name: Accept Android Licenses
-      run: |
-        yes | ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
-
-    - name: Install Android Packages
-      run: |
+        
+        # Configura environment variables
+        echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
+        echo "PATH=$HOME/android-sdk/cmdline-tools/latest/bin:$HOME/android-sdk/platform-tools:$PATH" >> $GITHUB_ENV
+        
+        # Aceita licenças automaticamente
+        yes | ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null
+        
+        # Instala componentes Android necessários
         ~/android-sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0"
 
-    - name: Install Bubblewrap Non-Interactive
+    - name: Install Bubblewrap (Full Non-Interactive)
       run: |
-        npm install -g @bubblewrap/cli
-        echo "Bubblewrap version: $(bubblewrap --version)"
+        # Instala o Bubblewrap sem perguntas
+        npm_config_yes=true npm install -g @bubblewrap/cli
+        
+        # Configura o Bubblewrap para não fazer perguntas
+        mkdir -p ~/.bubblewrap
+        echo '{"analyticsEnabled": false, "collectMetrics": false}' > ~/.bubblewrap/config.json
+        
+        # Verifica a instalação
+        bubblewrap --version
 
-    - name: Build APK
+    - name: Build APK (Forced Non-Interactive)
       run: |
         mkdir -p ./pwa-build
         cd ./pwa-build
-        echo -e "n\nn" | bubblewrap init \
+        
+        # Comando completo com todas as opções necessárias
+        bubblewrap init \
           --manifest=https://${{ github.repository_owner }}.github.io/faq/manifest.json \
           --jdkPath=/usr/lib/jvm/zulu17-jdk-amd64 \
-          --androidSdkPath=~/android-sdk \
-          --default
+          --androidSdkPath=$ANDROID_HOME \
+          --default \
+          --non-interactive
         
-        bubblewrap build --skipPwaValidation --skipVersionCheck
+        # Build com todas as validações desligadas
+        bubblewrap build \
+          --skipPwaValidation \
+          --skipVersionCheck \
+          --skipSigning
         
-        if [ -f "app-release.apk" ]; then
-          mv app-release.apk ../pwa-app.apk
+        if [ -f "app-release-unsigned.apk" ]; then
+          mv app-release-unsigned.apk ../pwa-app.apk
           echo "APK gerado com sucesso!"
           ls -lh ../pwa-app.apk
         else
           echo "::error::Falha na geração do APK"
+          ls -la
           exit 1
         fi
 
