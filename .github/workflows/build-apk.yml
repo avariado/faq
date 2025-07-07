@@ -18,13 +18,19 @@ jobs:
       with:
         node-version: 18
 
-    - name: Build APK with PWABuilder
+    - name: Install dependencies
       run: |
         npm install -g @pwabuilder/pwabuilder
-        pwabuilder https://avariado.github.io/faq/ -p android -l debug
-        mv platforms/android/app/build/outputs/apk/debug/*.apk ./pwa-app.apk
+        npm install -g @bubblewrap/cli
 
-    - name: Upload APK artifact
+    - name: Generate APK with Bubblewrap (recomendado)
+      run: |
+        bubblewrap init --manifest=https://${{ github.repository_owner }}.github.io/faq/manifest.json --directory=./pwa-build
+        cd pwa-build
+        bubblewrap build
+        mv ./app-release.apk ../pwa-app.apk
+
+    - name: Upload APK
       uses: actions/upload-artifact@v3
       with:
         name: pwa-apk
