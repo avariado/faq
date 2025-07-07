@@ -1,4 +1,4 @@
-name: Build PWA APK - Solução Garantida
+name: Build PWA APK - Versão Funcionando
 
 on:
   workflow_dispatch:
@@ -12,40 +12,35 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup Node.js
+    - name: Setup Node.js 20.x
       uses: actions/setup-node@v3
       with:
-        node-version: '18'
+        node-version: '20.x'
+        check-latest: true
 
     - name: Setup Java and Android
       uses: android-actions/setup-android@v3
 
-    - name: Install Dependencies
+    - name: Install System Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y curl git
-        curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-        sudo apt-get install -y nodejs
-        npm install -g npm@latest
+        sudo apt-get install -y git python3 make g++
 
-    - name: Install Bubblewrap (Approach 1)
-      id: bubblewrap
-      continue-on-error: true
+    - name: Install Bubblewrap (Stable Version)
       run: |
-        npm install -g @bubblewrap/cli@1.19.0 --no-fund --no-audit --silent
-        mkdir -p ~/.bubblewrap
-        echo '{"analyticsEnabled": false, "nonInteractive": true}' > ~/.bubblewrap/config.json
-
-    - name: Install Bubblewrap (Approach 2 - Fallback)
-      if: steps.bubblewrap.outcome == 'failure'
-      run: |
-        sudo npm install -g @bubblewrap/cli@1.19.0 --no-fund --no-audit --unsafe-perm
+        npm install -g @bubblewrap/cli@1.20.0 --no-fund --no-audit --silent
         mkdir -p ~/.bubblewrap
         echo '{"analyticsEnabled": false, "nonInteractive": true}' > ~/.bubblewrap/config.json
 
     - name: Verify Installation
       run: |
-        bubblewrap --version || (echo "::error::Bubblewrap installation failed" && exit 1)
+        echo "Node version: $(node -v)"
+        echo "npm version: $(npm -v)"
+        echo "Bubblewrap version: $(bubblewrap --version)"
+        if ! command -v bubblewrap &> /dev/null; then
+          echo "::error::Bubblewrap não está instalado corretamente"
+          exit 1
+        fi
 
     - name: Generate APK
       run: |
@@ -71,10 +66,12 @@ jobs:
 
         if [ -f "app-release-unsigned.apk" ]; then
           mv app-release-unsigned.apk ../pwa-app.apk
-          echo "✅ APK generated successfully!"
+          echo "✅ APK gerado com sucesso!"
           ls -lh ../pwa-app.apk
         else
-          echo "::error::❌ Critical failure - APK not generated"
+          echo "::error::❌ Falha na geração do APK"
+          echo "Verificando logs..."
+          cat ~/.bubblewrap/logs/*
           exit 1
         fi
 
