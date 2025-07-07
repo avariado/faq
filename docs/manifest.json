@@ -5,6 +5,9 @@
   "id": "/",
   "start_url": "/docs/",
   "display": "standalone",
+  "client_mode": "navigate-existing"
+},
+  "iarc_rating_id": "e84b072d",
   "launch_handler": {
   "client_mode": "navigate-existing"
 },
