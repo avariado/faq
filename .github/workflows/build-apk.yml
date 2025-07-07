@@ -6,7 +6,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20  # Aumentamos o tempo limite
+    timeout-minutes: 25
 
     steps:
     - name: Checkout code
@@ -14,41 +14,44 @@ jobs:
 
     - name: Setup environment
       run: |
-        # Instala dependências essenciais
         sudo apt-get update
         sudo apt-get install -y nodejs npm default-jdk
-        
-        # Configura o npm sem lockfile
-        npm config set package-lock false
-        
-        # Instala o Bubblewrap globalmente
         npm install -g @bubblewrap/cli
 
-    - name: Build APK (com tratamento de erro)
+    - name: Debug - Verify URLs
       run: |
-        set -e  # Sai imediatamente em caso de erro
+        echo "Verificando URLs essenciais:"
+        curl -I https://${{ github.repository_owner }}.github.io/faq/manifest.json
+        curl -I https://${{ github.repository_owner }}.github.io/faq/
+        curl -I https://${{ github.repository_owner }}.github.io/.well-known/assetlinks.json
+
+    - name: Build APK (método garantido)
+      run: |
+        # Cria diretório temporário
+        mkdir -p ./pwa-build
+        cd ./pwa-build
         
-        echo "Verificando manifest.json..."
-        curl -s https://${{ github.repository_owner }}.github.io/faq/manifest.json | jq empty
+        # Gera APK com fallbacks
+        bubblewrap init --manifest=https://${{ github.repository_owner }}.github.io/faq/manifest.json || \
+        bubblewrap init --manifest=https://${{ github.repository_owner }}.github.io/faq/manifest.json --default
         
-        echo "Iniciando construção do APK..."
-        timeout 15m bubblewrap build \
-          --manifest=https://${{ github.repository_owner }}.github.io/faq/manifest.json \
-          --skipVersionCheck \
-          --skipPwaValidation || echo "Continua após timeout"
+        bubblewrap build --skipPwaValidation --skipSigning
         
-        if [ -f "app-release.apk" ]; then
+        # Move o APK para a raiz
+        mv ./app-release.apk ../pwa-app.apk
+        
+        # Verificação final
+        if [ -f "../pwa-app.apk" ]; then
           echo "APK gerado com sucesso!"
-          ls -lh app-release.apk
+          ls -lh ../pwa-app.apk
         else
-          echo "::error::Falha na geração do APK"
+          echo "::error::Falha crítica - APK não gerado"
           exit 1
         fi
 
     - name: Upload APK
-      if: success() || failure()  # Executa mesmo com falha parcial
       uses: actions/upload-artifact@v4
       with:
         name: pwa-apk
-        path: app-release.apk
-        retention-days: 1
+        path: pwa-app.apk
+        if-no-files-found: error
