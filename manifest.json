@@ -2,12 +2,10 @@
   "name": "Leitor Q&A",
   "short_name": "FAQ",
   "description": "App do meu site GitHub",
-  "id": "/",
   "start_url": "/faq/",
   "display": "standalone",
   "scope": "/faq/",
   "background_color": "#000000",
-  "display_override": ["standalone", "minimal-ui"],
   "theme_color": "#6200ee",
   "icons": [
     {
@@ -20,9 +18,5 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ],
-  "launch_handler": {
-    "client_mode": "navigate-existing"
-  },
-  "iarc_rating_id": "12345"
+  ]
 }
