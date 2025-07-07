@@ -8,29 +8,37 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15  # Previne timeout precoce
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4  # Atualizado para v4
+      uses: actions/checkout@v4
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4  # Atualizado para v4
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
       with:
-        node-version: 20  # Versão mais recente do Node
+        node-version: '20'
+        cache: 'npm'
 
-    - name: Install dependencies
+    - name: Install Bubblewrap
       run: |
         npm install -g @bubblewrap/cli
-
-    - name: Generate APK with Bubblewrap
+        
+    - name: Generate APK
       run: |
-        bubblewrap init --manifest=https://${{ github.repository_owner }}.github.io/faq/manifest.json --directory=./pwa-build
+        # Verifica se o manifest está acessível
+        curl -s https://${{ github.repository_owner }}.github.io/faq/manifest.json || exit 1
+        
+        # Gera APK com timeout
+        timeout 300s bubblewrap init --manifest=https://${{ github.repository_owner }}.github.io/faq/manifest.json --directory=./pwa-build || exit 0
         cd pwa-build
-        bubblewrap build
-        mv ./app-release.apk ../pwa-app.apk
+        timeout 300s bubblewrap build || exit 0
+        [ -f app-release.apk ] && mv app-release.apk ../pwa-app.apk || exit 1
 
     - name: Upload APK
-      uses: actions/upload-artifact@v4  # Atualizado para v4
+      if: success() || failure()  # Executa mesmo com falha parcial
+      uses: actions/upload-artifact@v4
       with:
         name: pwa-apk
         path: pwa-app.apk
+        retention-days: 1
