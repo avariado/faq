@@ -1,4 +1,4 @@
-name: Build PWA APK - Solução Definitiva Funcional
+name: Build PWA APK - Solução Completa 2025
 
 on:
   workflow_dispatch:
@@ -12,74 +12,31 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup Java (JDK 17)
-      uses: actions/setup-java@v3
-      with:
-        distribution: 'temurin'
-        java-version: '17'
+    - name: Setup Java and Android
+      uses: android-actions/setup-android@v3
 
-    - name: Install Android SDK (Correct Way)
-      run: |
-        # Estrutura exata que o Android SDK requer
-        mkdir -p ~/android-sdk/cmdline-tools/latest
-        wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
-        unzip -q cmdline-tools.zip -d ~/android-sdk/cmdline-tools/latest
-        mv ~/android-sdk/cmdline-tools/latest/cmdline-tools/* ~/android-sdk/cmdline-tools/latest/
-        rm -rf ~/android-sdk/cmdline-tools/latest/cmdline-tools
-        
-        echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
-        echo "PATH=$HOME/android-sdk/cmdline-tools/latest/bin:$HOME/android-sdk/platform-tools:$PATH" >> $GITHUB_ENV
-        
-        # Aceita licenças automaticamente
-        yes | ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME --licenses >/dev/null
-        
-        # Instala pacotes necessários
-        ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME \
-          "platform-tools" \
-          "platforms;android-34" \
-          "build-tools;34.0.0"
-
-    - name: Install Bubblewrap (No Questions Asked)
+    - name: Install Bubblewrap (Non-Interactive)
       run: |
         npm install -g @bubblewrap/cli@1.9.0 --no-fund --no-audit --silent
         mkdir -p ~/.bubblewrap
         echo '{"analyticsEnabled": false, "nonInteractive": true}' > ~/.bubblewrap/config.json
 
-    - name: Prepare Build Environment
+    - name: Generate Auto-Response File
       run: |
         mkdir -p ./pwa-build
-        # Cria um arquivo de configuração completo
-        cat > ./pwa-build/input-config.json <<EOL
-        {
-          "manifest": "https://${{ github.repository_owner }}.github.io/faq/manifest.json",
-          "host": "${{ github.repository_owner }}.github.io",
-          "path": "/faq/",
-          "packageId": "com.pwa.faq",
-          "appVersionName": "1.0.0",
-          "appVersionCode": 1,
-          "enableNotifications": false,
-          "display": "standalone",
-          "jdkPath": "$JAVA_HOME",
-          "androidSdkPath": "$ANDROID_HOME"
-        }
-        EOL
+        # Cria arquivo com todas as respostas necessárias
+        echo -e "avariado.github.io\n/faq/\nn\nn\nn" > ./pwa-build/responses.txt
 
-    - name: Build APK (Forced Mode)
+    - name: Build APK (Forced Non-Interactive)
       run: |
         cd ./pwa-build
-        
-        # Comando completo com todos os parâmetros necessários
-        bubblewrap init \
-          --manifest=https://${{ github.repository_owner }}.github.io/faq/manifest.json \
+        # Pipe das respostas automáticas para o bubblewrap
+        cat responses.txt | bubblewrap init \
+          --manifest=https://avariado.github.io/faq/manifest.json \
           --jdkPath=$JAVA_HOME \
           --androidSdkPath=$ANDROID_HOME \
-          --default \
-          --nonInteractive=true \
-          --host=${{ github.repository_owner }}.github.io \
-          --path=/faq/ \
-          --packageId=com.pwa.faq
+          --default
         
-        # Build com todas as validações desligadas
         bubblewrap build \
           --skipPwaValidation \
           --skipVersionCheck \
@@ -91,9 +48,7 @@ jobs:
           ls -lh ../pwa-app.apk
         else
           echo "::error::❌ Falha na geração do APK"
-          echo "=== DEBUG INFO ==="
-          ls -la
-          bubblewrap doctor --verbose
+          bubblewrap doctor
           exit 1
         fi
 
