@@ -1,4 +1,4 @@
-name: Build PWA APK - Solução Final Não-Interativa
+name: Build PWA APK - Solução Definitiva
 
 on:
   workflow_dispatch:
@@ -17,50 +17,44 @@ jobs:
 
     - name: Install Bubblewrap
       run: |
-        npm install -g @bubblewrap/cli@1.9.0 --no-fund --no-audit --silent
+        npm install -g @bubblewrap/cli@1.19.0 --no-fund --no-audit --silent
         mkdir -p ~/.bubblewrap
         echo '{"analyticsEnabled": false, "nonInteractive": true}' > ~/.bubblewrap/config.json
 
-    - name: Generate and Build APK
+    - name: Generate APK
       run: |
-        mkdir -p ./pwa-build
-        cd ./pwa-build
+        # Cria diretório temporário
+        mkdir -p ./pwa-temp
+        cd ./pwa-temp
         
-        # Cria arquivo de configuração com todas as respostas pré-definidas
-        echo '{
-          "manifest": "https://avariado.github.io/faq/manifest.json",
-          "packageId": "com.pwa.faq",
-          "host": "avariado.github.io",
-          "path": "/faq/",
-          "appVersionName": "1.0.0",
-          "appVersionCode": 1,
-          "enableNotifications": false,
-          "display": "standalone",
-          "jdkPath": "'$JAVA_HOME'",
-          "androidSdkPath": "'$ANDROID_HOME'",
-          "default": true,
-          "nonInteractive": true
-        }' > config.json
+        # Comando DIRETO sem arquivos de configuração
+        bubblewrap init \
+          --manifest="https://avariado.github.io/faq/manifest.json" \
+          --packageId="com.pwa.faq" \
+          --host="avariado.github.io" \
+          --path="/faq/" \
+          --appVersionName="1.0.0" \
+          --appVersionCode=1 \
+          --enableNotifications=false \
+          --display="standalone" \
+          --default \
+          --non-interactive
         
-        # Gera o projeto forçando modo não interativo
-        bubblewrap init --config=config.json --default --non-interactive <<ANSWERS
-        avariado.github.io
-        /faq/
-        ANSWERS
-        
-        # Constrói o APK
+        # Build do APK (modo silencioso)
         bubblewrap build \
           --skipPwaValidation \
           --skipVersionCheck \
-          --skipSigning
+          --skipSigning > /dev/null 2>&1
         
+        # Verifica e move o APK
         if [ -f "app-release-unsigned.apk" ]; then
           mv app-release-unsigned.apk ../pwa-app.apk
           echo "✅ APK gerado com sucesso!"
           ls -lh ../pwa-app.apk
         else
-          echo "::error::❌ Falha na geração do APK"
-          bubblewrap doctor
+          echo "::error::❌ Falha crítica - APK não gerado"
+          echo "Últimos logs:"
+          cat ~/.bubblewrap/logs/*
           exit 1
         fi
 
