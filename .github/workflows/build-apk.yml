@@ -1,4 +1,4 @@
-name: Build PWA APK - Solução Final
+name: Build PWA APK - Solução Final 2025
 
 on:
   workflow_dispatch:
@@ -18,9 +18,9 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Install Android Command Line Tools (Correct Structure)
+    - name: Install Android SDK (Non-Interactive)
       run: |
-        # Cria a estrutura de pastas correta
+        # Cria estrutura EXATA que o Android SDK requer
         mkdir -p ~/android-sdk/cmdline-tools/latest
         wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
         unzip -q cmdline-tools.zip -d ~/android-sdk/cmdline-tools/latest
@@ -28,47 +28,74 @@ jobs:
         rm -rf ~/android-sdk/cmdline-tools/latest/cmdline-tools
         
         echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
-        echo "PATH=$HOME/android-sdk/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
+        echo "PATH=$HOME/android-sdk/cmdline-tools/latest/bin:$HOME/android-sdk/platform-tools:$PATH" >> $GITHUB_ENV
+        
+        # Aceita licenças automaticamente
+        yes | ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME --licenses >/dev/null 2>&1
+        
+        # Instala pacotes essenciais
+        ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME \
+          "platform-tools" \
+          "platforms;android-34" \
+          "build-tools;34.0.0" \
+          "cmdline-tools;latest"
 
-    - name: Accept Licenses and Install Packages
+    - name: Install Bubblewrap (Forced Non-Interactive)
       run: |
-        yes | ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME --licenses >/dev/null
-        ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "platforms;android-33" "build-tools;33.0.0"
-        echo "PATH=$ANDROID_HOME/platform-tools:$PATH" >> $GITHUB_ENV
-
-    - name: Install Bubblewrap
-      run: |
-        npm install -g @bubblewrap/cli@1.9.0 --no-fund --no-audit
+        # Instala sem perguntas
+        npm_config_yes=true npm install -g @bubblewrap/cli@latest --no-fund --no-audit --silent
+        
+        # Configura para nunca perguntar nada
         mkdir -p ~/.bubblewrap
-        echo '{"analyticsEnabled": false, "collectMetrics": false}' > ~/.bubblewrap/config.json
+        echo '{
+          "analyticsEnabled": false,
+          "collectMetrics": false,
+          "enableExperimental": true,
+          "nonInteractive": true
+        }' > ~/.bubblewrap/config.json
 
-    - name: Build APK
+    - name: Generate Config Automatically
       run: |
+        # Cria um arquivo de configuração pré-definido
         mkdir -p ./pwa-build
+        cat > ./pwa-build/config.json <<EOL
+        {
+          "manifest": "https://${{ github.repository_owner }}.github.io/faq/manifest.json",
+          "host": "avariado.github.io",
+          "path": "/faq/",
+          "jdkPath": "$JAVA_HOME",
+          "androidSdkPath": "$ANDROID_HOME",
+          "packageId": "com.pwa.faq",
+          "appVersionName": "1.0.0",
+          "appVersionCode": 1,
+          "enableNotifications": false,
+          "launcherName": "FAQ PWA",
+          "display": "standalone"
+        }
+        EOL
+
+    - name: Build APK (100% Non-Interactive)
+      run: |
         cd ./pwa-build
         
-        # Cria arquivo de respostas automáticas
-        printf "n\nn" > responses.txt
+        # Gera projeto sem perguntas usando config pré-definida
+        bubblewrap init --config=config.json --default --non-interactive
         
-        bubblewrap init \
-          --manifest=https://${{ github.repository_owner }}.github.io/faq/manifest.json \
-          --jdkPath=$JAVA_HOME \
-          --androidSdkPath=$ANDROID_HOME \
-          --default < responses.txt
-        
+        # Build com todas as validações desligadas
         bubblewrap build \
           --skipPwaValidation \
           --skipVersionCheck \
-          --skipSigning
+          --skipSigning \
+          --non-interactive
         
         if [ -f "app-release-unsigned.apk" ]; then
           mv app-release-unsigned.apk ../pwa-app.apk
           echo "✅ APK gerado com sucesso!"
           ls -lh ../pwa-app.apk
         else
-          echo "::error::❌ Falha na geração do APK"
-          echo "=== DEBUG ==="
-          bubblewrap doctor
+          echo "::error::❌ Falha crítica na geração do APK"
+          echo "=== DEBUG INFORMATION ==="
+          bubblewrap doctor --verbose
           ls -la
           exit 1
         fi
