@@ -1,8 +1,0 @@
-[{
-      "relation": ["delegate_permission/common.handle_all_urls"],
-      "target": {
-        "namespace": "android_app",
-        "package_name": "io.github.avariado.twa",
-        "sha256_cert_fingerprints": ["8E:E8:2E:19:D2:E0:23:A2:E0:19:81:7F:84:94:6E:4C:24:5C:F0:9D:2E:65:9F:F2:D0:1C:E2:EF:65:16:E4:30"]
-      }
-    }]
