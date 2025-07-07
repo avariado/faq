@@ -1,10 +1,10 @@
 const CACHE_NAME = 'cache-v1';
 const urlsToCache = [
-  '/docs/',
-  '/docs/index.html',         
-  '/docs/icon-192x192.png',
-  '/docs/icon-512x512.png',
-  '/docs/manifest.json'
+  '/',
+  '/index.html',         
+  '/icon-192x192.png',
+  '/icon-512x512.png',
+  '/manifest.json'
 ];
 
 // Instala o Service Worker e cacheia tudo
