@@ -1,4 +1,4 @@
-name: Build PWA APK - Solução Completa 2025
+name: Build PWA APK - Solução Final Não-Interativa
 
 on:
   workflow_dispatch:
@@ -15,28 +15,38 @@ jobs:
     - name: Setup Java and Android
       uses: android-actions/setup-android@v3
 
-    - name: Install Bubblewrap (Non-Interactive)
+    - name: Install Bubblewrap
       run: |
         npm install -g @bubblewrap/cli@1.9.0 --no-fund --no-audit --silent
         mkdir -p ~/.bubblewrap
         echo '{"analyticsEnabled": false, "nonInteractive": true}' > ~/.bubblewrap/config.json
 
-    - name: Generate Auto-Response File
+    - name: Create Config File
       run: |
         mkdir -p ./pwa-build
-        # Cria arquivo com todas as respostas necessárias
-        echo -e "avariado.github.io\n/faq/\nn\nn\nn" > ./pwa-build/responses.txt
+        cat > ./pwa-build/config.json <<EOL
+        {
+          "manifest": "https://avariado.github.io/faq/manifest.json",
+          "packageId": "com.pwa.faq",
+          "host": "avariado.github.io",
+          "path": "/faq/",
+          "appVersionName": "1.0.0",
+          "appVersionCode": 1,
+          "enableNotifications": false,
+          "display": "standalone",
+          "jdkPath": "$JAVA_HOME",
+          "androidSdkPath": "$ANDROID_HOME"
+        }
+        EOL
 
-    - name: Build APK (Forced Non-Interactive)
+    - name: Generate and Build APK
       run: |
         cd ./pwa-build
-        # Pipe das respostas automáticas para o bubblewrap
-        cat responses.txt | bubblewrap init \
-          --manifest=https://avariado.github.io/faq/manifest.json \
-          --jdkPath=$JAVA_HOME \
-          --androidSdkPath=$ANDROID_HOME \
-          --default
         
+        # Gera o projeto sem perguntas
+        bubblewrap init --config=config.json --default --non-interactive
+        
+        # Constrói o APK
         bubblewrap build \
           --skipPwaValidation \
           --skipVersionCheck \
