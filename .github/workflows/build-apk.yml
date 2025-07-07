@@ -21,30 +21,26 @@ jobs:
         mkdir -p ~/.bubblewrap
         echo '{"analyticsEnabled": false, "nonInteractive": true}' > ~/.bubblewrap/config.json
 
-    - name: Create Config File
-      run: |
-        mkdir -p ./pwa-build
-        cat > ./pwa-build/config.json <<EOL
-        {
-          "manifest": "https://avariado.github.io/faq/manifest.json",
-          "packageId": "com.pwa.faq",
-          "host": "avariado.github.io",
-          "path": "/faq/",
-          "appVersionName": "1.0.0",
-          "appVersionCode": 1,
-          "enableNotifications": false,
-          "display": "standalone",
-          "jdkPath": "$JAVA_HOME",
-          "androidSdkPath": "$ANDROID_HOME"
-        }
-        EOL
-
     - name: Generate and Build APK
       run: |
+        # Cria diretório para o build
+        mkdir -p ./pwa-build
         cd ./pwa-build
         
-        # Gera o projeto sem perguntas
-        bubblewrap init --config=config.json --default --non-interactive
+        # Gera o projeto diretamente sem arquivo de configuração separado
+        bubblewrap init \
+          --manifest=https://avariado.github.io/faq/manifest.json \
+          --packageId=com.pwa.faq \
+          --host=avariado.github.io \
+          --path=/faq/ \
+          --appVersionName=1.0.0 \
+          --appVersionCode=1 \
+          --enableNotifications=false \
+          --display=standalone \
+          --jdkPath=$JAVA_HOME \
+          --androidSdkPath=$ANDROID_HOME \
+          --default \
+          --non-interactive
         
         # Constrói o APK
         bubblewrap build \
