@@ -1,4 +1,4 @@
-name: Build PWA APK - Solução Definitiva
+name: Build PWA APK - Solução Final
 
 on:
   workflow_dispatch:
@@ -18,20 +18,27 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Install Android Tools
+    - name: Install Android Command Line Tools (Correct Structure)
       run: |
-        mkdir -p ~/android-sdk
+        # Cria a estrutura de pastas correta
+        mkdir -p ~/android-sdk/cmdline-tools/latest
         wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
-        unzip -q cmdline-tools.zip -d ~/android-sdk
-        mv ~/android-sdk/cmdline-tools ~/android-sdk/tools
-        echo "ANDROID_HOME=~/android-sdk" >> $GITHUB_ENV
-        echo "PATH=~/android-sdk/tools/bin:~/android-sdk/platform-tools:$PATH" >> $GITHUB_ENV
-        yes | ~/android-sdk/tools/bin/sdkmanager --licenses >/dev/null
-        ~/android-sdk/tools/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0"
+        unzip -q cmdline-tools.zip -d ~/android-sdk/cmdline-tools/latest
+        mv ~/android-sdk/cmdline-tools/latest/cmdline-tools/* ~/android-sdk/cmdline-tools/latest/
+        rm -rf ~/android-sdk/cmdline-tools/latest/cmdline-tools
+        
+        echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
+        echo "PATH=$HOME/android-sdk/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
 
-    - name: Install Bubblewrap (Non-Interactive)
+    - name: Accept Licenses and Install Packages
       run: |
-        npm_config_yes=true npm install -g @bubblewrap/cli@1.9.0 --no-fund --no-audit
+        yes | ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME --licenses >/dev/null
+        ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "platforms;android-33" "build-tools;33.0.0"
+        echo "PATH=$ANDROID_HOME/platform-tools:$PATH" >> $GITHUB_ENV
+
+    - name: Install Bubblewrap
+      run: |
+        npm install -g @bubblewrap/cli@1.9.0 --no-fund --no-audit
         mkdir -p ~/.bubblewrap
         echo '{"analyticsEnabled": false, "collectMetrics": false}' > ~/.bubblewrap/config.json
 
@@ -40,8 +47,8 @@ jobs:
         mkdir -p ./pwa-build
         cd ./pwa-build
         
-        # Cria um arquivo de resposta automática
-        echo -e "n\nn" > responses.txt
+        # Cria arquivo de respostas automáticas
+        printf "n\nn" > responses.txt
         
         bubblewrap init \
           --manifest=https://${{ github.repository_owner }}.github.io/faq/manifest.json \
@@ -60,7 +67,9 @@ jobs:
           ls -lh ../pwa-app.apk
         else
           echo "::error::❌ Falha na geração do APK"
+          echo "=== DEBUG ==="
           bubblewrap doctor
+          ls -la
           exit 1
         fi
 
