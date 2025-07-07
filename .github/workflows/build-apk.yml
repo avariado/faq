@@ -1,4 +1,4 @@
-name: Build PWA APK Nuclear Option
+name: Build PWA APK - Ultimate Solution
 
 on:
   workflow_dispatch:
@@ -12,60 +12,46 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup Environment
+    - name: Setup Java (JDK 17)
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Install Android Command Line Tools
       run: |
-        # Instala todas as dependências necessárias
-        sudo apt-get update
-        sudo apt-get install -y wget unzip zip
-        
-        # JDK 17 (Zulu)
-        wget -qO - https://apt.corretto.aws/corretto.key | sudo apt-key add - 
-        sudo add-apt-repository 'deb https://apt.corretto.aws stable main'
-        sudo apt-get update
-        sudo apt-get install -y zulu17-jdk
-        
-        # Android SDK
         mkdir -p ~/android-sdk/cmdline-tools
         wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
         unzip -q cmdline-tools.zip -d ~/android-sdk/cmdline-tools
         mv ~/android-sdk/cmdline-tools/cmdline-tools ~/android-sdk/cmdline-tools/latest
-        
-        # Configura environment variables
         echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
         echo "PATH=$HOME/android-sdk/cmdline-tools/latest/bin:$HOME/android-sdk/platform-tools:$PATH" >> $GITHUB_ENV
-        
-        # Aceita licenças automaticamente
+
+    - name: Accept Android Licenses
+      run: |
         yes | ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null
-        
-        # Instala componentes Android necessários
+
+    - name: Install Android Packages
+      run: |
         ~/android-sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0"
 
-    - name: Install Bubblewrap (Full Non-Interactive)
+    - name: Install Bubblewrap
       run: |
-        # Instala o Bubblewrap sem perguntas
-        npm_config_yes=true npm install -g @bubblewrap/cli
-        
-        # Configura o Bubblewrap para não fazer perguntas
-        mkdir -p ~/.bubblewrap
-        echo '{"analyticsEnabled": false, "collectMetrics": false}' > ~/.bubblewrap/config.json
-        
-        # Verifica a instalação
-        bubblewrap --version
+        npm install -g @bubblewrap/cli@1.9.0
+        echo "Bubblewrap version: $(bubblewrap --version)"
 
-    - name: Build APK (Forced Non-Interactive)
+    - name: Build APK
       run: |
         mkdir -p ./pwa-build
         cd ./pwa-build
         
-        # Comando completo com todas as opções necessárias
-        bubblewrap init \
+        # Força modo não interativo
+        echo -e "n\nn" | bubblewrap init \
           --manifest=https://${{ github.repository_owner }}.github.io/faq/manifest.json \
-          --jdkPath=/usr/lib/jvm/zulu17-jdk-amd64 \
+          --jdkPath=$JAVA_HOME \
           --androidSdkPath=$ANDROID_HOME \
-          --default \
-          --non-interactive
+          --default
         
-        # Build com todas as validações desligadas
         bubblewrap build \
           --skipPwaValidation \
           --skipVersionCheck \
