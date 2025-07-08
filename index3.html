@@ -555,12 +555,11 @@
         </div>
     </div>
 
-    <input type="file" id="file-input" accept=".txt,.pdf,.epub">
+    <input type="file" id="file-input" accept=".txt,.pdf">
     <a id="file-export" download="perguntas_respostas.txt"></a>
 
-    <!-- Bibliotecas para processamento de PDF e EPUB -->
+    <!-- Bibliotecas para processamento de PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <script>
@@ -1083,8 +1082,6 @@
                     processTxtFile(file);
                 } else if (fileExtension === 'pdf') {
                     processPdfFile(file);
-                } else if (fileExtension === 'epub') {
-                    processEpubFile(file);
                 } else {
                     hideLoading();
                     alert('Formato de arquivo não suportado!');
@@ -1173,60 +1170,6 @@
                     alert('Erro ao ler o arquivo PDF');
                 };
                 fileReader.readAsArrayBuffer(file);
-            }
-
-            function processEpubFile(file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    try {
-                        // Criar um objeto URL para o arquivo EPUB
-                        const epubUrl = URL.createObjectURL(new Blob([e.target.result], { type: 'application/epub+zip' }));
-                        
-                        // Inicializar o livro EPUB
-                        const book = ePub(epubUrl);
-                        
-                        book.ready.then(() => {
-                            // Obter todos os itens da espinha (conteúdo principal)
-                            return book.spine.spineItems;
-                        }).then(spineItems => {
-                            // Extrair texto de cada item
-                            const extractionPromises = spineItems.map(item => {
-                                return book.load(item.idref).then(section => {
-                                    // Criar um elemento div temporário para extrair texto
-                                    const tempDiv = document.createElement('div');
-                                    tempDiv.innerHTML = section.content;
-                                    return tempDiv.textContent || tempDiv.innerText || "";
-                                });
-                            });
-                            
-                            return Promise.all(extractionPromises);
-                        }).then(texts => {
-                            // Juntar todo o texto extraído
-                            const fullText = texts.join('\n');
-                            
-                            // Processar o texto
-                            parseTextContent(fullText);
-                            updateDisplay();
-                            toggleMenu();
-                            hideLoading();
-                            
-                            // Liberar o objeto URL
-                            URL.revokeObjectURL(epubUrl);
-                        }).catch(error => {
-                            hideLoading();
-                            alert('Erro ao processar EPUB: ' + error.message);
-                            URL.revokeObjectURL(epubUrl);
-                        });
-                    } catch (error) {
-                        hideLoading();
-                        alert('Erro ao processar EPUB: ' + error.message);
-                    }
-                };
-                reader.onerror = function() {
-                    hideLoading();
-                    alert('Erro ao ler o arquivo EPUB');
-                };
-                reader.readAsArrayBuffer(file);
             }
 
             function showLoading(message) {
@@ -1373,6 +1316,16 @@
             }
             
             function clearSearch() {
+                searchTerm = '';
+                searchResults = [];
+                currentSearchIndex = -1;
+                searchInfo.textContent = '';
+                searchPrevBtn.disabled = true;
+                searchNextBtn.disabled = true;
+                isFirstSearchClick = true;
+                updateDisplay();
+            }
+                        function clearSearch() {
                 searchTerm = '';
                 searchResults = [];
                 currentSearchIndex = -1;
