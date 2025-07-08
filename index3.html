@@ -701,96 +701,124 @@
             // Teclado
             document.addEventListener('keydown', handleKeyDown);
         }
-                async function importPdfFile(file) {
-            const arrayBuffer = await file.arrayBuffer();
-            const loadingTask = pdfjsLib.getDocument(arrayBuffer);
-            const pdf = await loadingTask.promise;
-            
-            items = [];
-            const totalPages = pdf.numPages;
-            
-            for (let i = 1; i <= totalPages; i++) {
-                updateProgress(Math.round((i / totalPages) * 100));
-                const page = await pdf.getPage(i);
-                const textContent = await page.getTextContent();
+                        async function importPdfFile(file) {
+            try {
+                showProgressModal('Processando PDF...');
                 
-                // Método corrigido para extrair texto mantendo a formatação
-                let text = '';
-                let lastY = -1;
+                // Carregar o PDF
+                const arrayBuffer = await file.arrayBuffer();
+                const loadingTask = pdfjsLib.getDocument(arrayBuffer);
+                const pdf = await loadingTask.promise;
                 
-                for (const item of textContent.items) {
-                    // Agrupar por linhas (baseado na posição Y)
-                    if (Math.abs(item.transform[5] - lastY) > 5) {
-                        text += '\n';
+                items = [];
+                const totalPages = pdf.numPages;
+                
+                // Extrair texto de cada página
+                for (let i = 1; i <= totalPages; i++) {
+                    updateProgress(Math.round((i / totalPages) * 100));
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    
+                    // Construir texto preservando quebras de linha
+                    let pageText = '';
+                    let lastY = 0;
+                    
+                    for (const item of textContent.items) {
+                        // Detectar mudanças de linha pela posição Y
+                        if (Math.abs(item.transform[5] - lastY) > 5) {
+                            pageText += '\n';
+                        }
                         lastY = item.transform[5];
+                        pageText += item.str + ' ';
                     }
-                    text += item.str + ' ';
+                    
+                    // Adicionar ao conteúdo
+                    if (pageText.trim()) {
+                        if (isQAMode) {
+                            // Dividir em perguntas e respostas
+                            const qaPairs = extractQAPairsFromText(pageText);
+                            items.push(...qaPairs);
+                        } else {
+                            items.push({ text: pageText.trim() });
+                        }
+                    }
                 }
                 
-                text = text.replace(/\s+/g, ' ').trim(); // Limpar espaços extras
+                originalItems = [...items];
+                currentIndex = 0;
+                updateDisplay();
+                saveState();
                 
-                if (text) {
-                    if (isQAMode) {
-                        const qaPairs = extractQAPairsFromText(text);
-                        items.push(...qaPairs);
-                    } else {
-                        items.push({ text: text });
-                    }
-                }
+            } catch (error) {
+                console.error('Erro ao importar PDF:', error);
+                alert('Erro ao importar PDF: ' + error.message);
+            } finally {
+                hideProgressModal();
             }
-            
-            originalItems = [...items];
-            currentIndex = 0;
-            updateDisplay();
-            saveState();
         }
 
         async function importEpubFile(file) {
-            const arrayBuffer = await file.arrayBuffer();
-            
-            // Converter ArrayBuffer para Uint8Array que o EPUB.js espera
-            const uint8Array = new Uint8Array(arrayBuffer);
-            const book = new Epub(uint8Array);
-            
-            items = [];
-            
-            await book.ready;
-            
-            // Processar cada capítulo
-            for (const spineItem of book.spine.contents) {
-                try {
-                    const text = await spineItem.load(book.load.bind(book));
-                    
-                    // Extrair texto do HTML (se aplicável)
-                    let cleanText = '';
-                    if (typeof text === 'string') {
-                        // Remover tags HTML e extrair texto
-                        const div = document.createElement('div');
-                        div.innerHTML = text;
-                        cleanText = div.textContent || div.innerText || '';
-                    } else {
-                        // Já é texto puro
-                        cleanText = text;
-                    }
-                    
-                    // Limpar e normalizar o texto
-                    cleanText = cleanText
-                        .replace(/[^\x00-\x7F]/g, '') // Remover caracteres não-ASCII
-                        .replace(/\s+/g, ' ') // Espaços múltiplos para único
-                        .trim();
-                    
-                    if (cleanText) {
-                        if (isQAMode) {
-                            const qaPairs = extractQAPairsFromText(cleanText);
-                            items.push(...qaPairs);
+            try {
+                showProgressModal('Processando EPUB...');
+                
+                // Converter para ArrayBuffer
+                const arrayBuffer = await file.arrayBuffer();
+                const book = new Epub(arrayBuffer);
+                await book.ready;
+                
+                items = [];
+                let totalItems = book.spine.contents.length;
+                let processed = 0;
+                
+                // Processar cada capítulo
+                for (const spineItem of book.spine.contents) {
+                    try {
+                        const text = await spineItem.load(book.load.bind(book));
+                        let cleanText = '';
+                        
+                        // Extrair texto do conteúdo
+                        if (typeof text === 'string') {
+                            // Remover HTML tags
+                            cleanText = text.replace(/<[^>]+>/g, ' ');
                         } else {
-                            items.push({ text: cleanText });
+                            cleanText = text.toString();
                         }
+                        
+                        // Limpar texto
+                        cleanText = cleanText
+                            .replace(/\s+/g, ' ')
+                            .trim();
+                        
+                        // Adicionar conteúdo
+                        if (cleanText) {
+                            if (isQAMode) {
+                                const qaPairs = extractQAPairsFromText(cleanText);
+                                items.push(...qaPairs);
+                            } else {
+                                items.push({ text: cleanText });
+                            }
+                        }
+                        
+                    } catch (error) {
+                        console.error('Erro no capítulo EPUB:', error);
                     }
-                } catch (error) {
-                    console.error('Erro ao processar capítulo EPUB:', error);
+                    
+                    processed++;
+                    updateProgress(Math.round((processed / totalItems) * 100));
                 }
+                
+                originalItems = [...items];
+                currentIndex = 0;
+                updateDisplay();
+                saveState();
+                
+            } catch (error) {
+                console.error('Erro ao importar EPUB:', error);
+                alert('Erro ao importar EPUB: ' + error.message);
+            } finally {
+                hideProgressModal();
             }
+        }
             
             originalItems = [...items];
             currentIndex = 0;
