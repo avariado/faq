@@ -1267,8 +1267,7 @@
                 
                 reader.readAsArrayBuffer(file);
             }
-
-            function showProgressModal(message) {
+                        function showProgressModal(message) {
                 progressModal.querySelector('h2').textContent = message;
                 progressModal.classList.add('active');
                 overlay.classList.add('active');
@@ -1285,7 +1284,8 @@
                 progressModal.classList.remove('active');
                 overlay.classList.remove('active');
             }
-                        function exportFile() {
+
+            function exportFile() {
                 if (items.length === 0) return;
                 
                 let content;
