@@ -572,8 +572,7 @@
 
     <input type="file" id="file-input" accept=".txt,.pdf,.epub">
     <a id="file-export" download="perguntas_respostas.txt"></a>
-
-    <script>
+        <script>
         // Configurar pdf.js worker
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
 
@@ -1103,7 +1102,6 @@
                     alert('Formato de arquivo não suportado. Por favor, use .txt, .pdf ou .epub.');
                 }
                 
-                // Resetar o input para permitir a seleção do mesmo arquivo novamente
                 e.target.value = '';
             }
 
@@ -1140,7 +1138,7 @@
                         }
                         
                         updateDisplay();
-                        toggleMenu();
+                        toggleMenu(); // Fechar o menu após importação
                     } catch (error) {
                         alert('Erro ao ler o arquivo: ' + error.message);
                     }
@@ -1156,7 +1154,6 @@
                 reader.onload = function(e) {
                     const typedArray = new Uint8Array(e.target.result);
                     
-                    // Configurar pdf.js
                     pdfjsLib.getDocument(typedArray).promise.then(function(pdf) {
                         let totalPages = pdf.numPages;
                         let extractedText = '';
@@ -1169,7 +1166,6 @@
                                     extractedText += pageText + '\n';
                                     pagesProcessed++;
                                     
-                                    // Atualizar progresso
                                     const progress = Math.floor((pagesProcessed / totalPages) * 100);
                                     updateProgress(progress);
                                     
@@ -1183,10 +1179,10 @@
                         }
                         
                         processPage(1).then(function(fullText) {
-                            hideProgressModal();
                             parseTextContent(fullText);
                             updateDisplay();
-                            toggleMenu();
+                            hideProgressModal();
+                            toggleMenu(); // Fechar o menu após importação
                         }).catch(function(error) {
                             hideProgressModal();
                             alert('Erro ao processar PDF: ' + error.message);
@@ -1206,15 +1202,10 @@
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     const arrayBuffer = e.target.result;
-                    
-                    // Converter ArrayBuffer para Uint8Array
                     const uint8Array = new Uint8Array(arrayBuffer);
-                    
-                    // Criar um blob para o EPUB.js
                     const blob = new Blob([uint8Array], {type: 'application/epub+zip'});
                     const url = URL.createObjectURL(blob);
                     
-                    // Configurar EPUB.js
                     const book = ePub(url);
                     let extractedText = '';
                     let spineItems = [];
@@ -1234,7 +1225,6 @@
                             
                             return book.load(spineItems[index]).then(function(section) {
                                 return section.load(spineItems[index] + '.xhtml').then(function(doc) {
-                                    // Extrair texto de todos os elementos de texto
                                     const walker = document.createTreeWalker(
                                         doc, 
                                         NodeFilter.SHOW_TEXT, 
@@ -1253,7 +1243,6 @@
                                     extractedText += pageText + '\n';
                                     itemsProcessed++;
                                     
-                                    // Atualizar progresso
                                     const progress = Math.floor((itemsProcessed / spineItems.length) * 100);
                                     updateProgress(progress);
                                     
@@ -1264,11 +1253,11 @@
                         
                         return processSpineItem(0);
                     }).then(function(fullText) {
-                        hideProgressModal();
-                        URL.revokeObjectURL(url);
                         parseTextContent(fullText);
                         updateDisplay();
-                        toggleMenu();
+                        hideProgressModal();
+                        URL.revokeObjectURL(url);
+                        toggleMenu(); // Fechar o menu após importação
                     }).catch(function(error) {
                         hideProgressModal();
                         URL.revokeObjectURL(url);
@@ -1296,8 +1285,7 @@
                 progressModal.classList.remove('active');
                 overlay.classList.remove('active');
             }
-
-            function exportFile() {
+                        function exportFile() {
                 if (items.length === 0) return;
                 
                 let content;
@@ -1315,7 +1303,7 @@
                 fileExport.click();
                 
                 URL.revokeObjectURL(url);
-                toggleMenu();
+                toggleMenu(); // Fechar o menu após exportação
             }
             
             function saveState() {
