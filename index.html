@@ -416,6 +416,19 @@
             text-align: center;
         }
 
+        .processing-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 5px;
+            z-index: 100;
+            display: none;
+        }
+
         @media (max-width: 600px) {
             #menu {
                 width: 80%;
@@ -516,10 +529,16 @@
         </div>
     </div>
 
-    <input type="file" id="file-input" accept=".txt">
+    <input type="file" id="file-input" accept=".txt,.pdf">
     <a id="file-export" download="perguntas_respostas.txt"></a>
+    
+    <div class="processing-message" id="processing-message">Processando PDF...</div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
     <script>
+        // Configuração do PDF.js para evitar problemas com CORS
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
+
         function adjustViewport() {
             const vh = window.innerHeight * 0.01;
             document.documentElement.style.setProperty('--vh', `${vh}px`);
@@ -568,6 +587,7 @@
             const searchPrevBtn = document.getElementById('search-prev-btn');
             const searchNextBtn = document.getElementById('search-next-btn');
             const searchInfo = document.getElementById('search-info');
+            const processingMessage = document.getElementById('processing-message');
 
             let items = [];
             let originalItems = [];
@@ -579,7 +599,7 @@
             let searchTerm = '';
             let searchResults = [];
             let currentSearchIndex = -1;
-            let isFirstSearchClick = true; // Nova variável para controlar o primeiro clique
+            let isFirstSearchClick = true;
 
             loadSampleData();
             updateDisplay();
@@ -632,7 +652,6 @@
                 }
             });
             
-            // Resetar a flag quando o input muda
             searchInput.addEventListener('input', function() {
                 isFirstSearchClick = true;
             });
@@ -789,14 +808,11 @@
                 const lines = text.split('\n').filter(line => line.trim() !== '');
                 if (lines.length < 2) return false;
                 
-                // Verifica se cada linha contém apenas uma frase (não contém ponto final no meio)
                 for (const line of lines) {
                     const trimmedLine = line.trim();
-                    // Se a linha tem um ponto final que não está no final, não é o formato alternado
                     if (trimmedLine.split('.').length > 2 && !trimmedLine.endsWith('.')) {
                         return false;
                     }
-                    // Se a linha tem múltiplas frases separadas por pontos, não é o formato alternado
                     if ((trimmedLine.match(/[.!?]/g) || []).length > 1) {
                         return false;
                     }
@@ -867,41 +883,33 @@
             }
 
             function parseTextContent(text) {
-                // Substitui quebras de linha por espaço, exceto antes de pontuação
                 let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
                 cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
                 
-                // Divide em frases completas terminadas por .!?…
                 const sentenceRegex = /[^.!?]+[.!?…]+/g;
                 let sentences = cleanedText.match(sentenceRegex) || [];
                 sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
                 
-                // Processa frases para garantir tamanho mínimo
                 let processedItems = [];
                 let currentChunk = '';
                 
                 for (let i = 0; i < sentences.length; i++) {
                     const sentence = sentences[i];
                     
-                    // Se juntando com a próxima frase ainda ficar pequeno
                     if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
                         currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
                         continue;
                     }
                     
-                    // Se já tem conteúdo acumulado ou a frase é grande o suficiente
                     if (currentChunk || sentence.length >= 75) {
                         processedItems.push({
                             text: currentChunk ? currentChunk + ' ' + sentence : sentence
                         });
                         currentChunk = '';
                     } 
-                    // Se a frase é pequena e é a última
                     else if (i === sentences.length - 1 && processedItems.length > 0) {
-                        // Adiciona ao último item se for muito pequena
                         processedItems[processedItems.length - 1].text += ' ' + sentence;
                     }
-                    // Frase pequena isolada (permite exceção para não perder conteúdo)
                     else {
                         processedItems.push({ text: sentence });
                     }
@@ -929,7 +937,6 @@
                     questionEl.innerHTML = currentItem.question;
                     answerEl.innerHTML = currentItem.answer;
                     
-                    // Mostra automaticamente a resposta se contiver o termo de pesquisa
                     if (searchTerm && currentItem.answer.toLowerCase().includes(searchTerm.toLowerCase())) {
                         answerEl.classList.add('visible');
                     } else {
@@ -944,22 +951,18 @@
                 currentCardInput.value = currentIndex + 1;
                 totalCardsSpan.textContent = `/ ${items.length}`;
                 
-                // Ajusta o tamanho do input para o conteúdo
                 adjustInputWidth();
                 
                 cardContent.scrollTop = 0;
                 
-                // Aplicar highlights se houver pesquisa ativa
                 if (searchTerm) {
                     highlightText();
                 }
                 
-                // Atualizar estado dos botões de navegação de pesquisa
                 updateSearchButtons();
             }
 
             function adjustInputWidth() {
-                // Ajusta o tamanho do input para o conteúdo
                 const tempSpan = document.createElement('span');
                 tempSpan.style.visibility = 'hidden';
                 tempSpan.style.whiteSpace = 'nowrap';
@@ -968,7 +971,7 @@
                 tempSpan.textContent = currentCardInput.value;
                 document.body.appendChild(tempSpan);
                 
-                const width = tempSpan.offsetWidth + 10; // Adiciona um pouco de padding
+                const width = tempSpan.offsetWidth + 10;
                 currentCardInput.style.width = `${Math.max(width, 30)}px`;
                 
                 document.body.removeChild(tempSpan);
@@ -1048,6 +1051,20 @@
                 const file = e.target.files[0];
                 if (!file) return;
                 
+                // Fechar o menu imediatamente
+                toggleMenu();
+                
+                if (file.name.endsWith('.pdf')) {
+                    processPDFFile(file);
+                } else {
+                    processTextFile(file);
+                }
+                
+                // Limpar o input para permitir a seleção do mesmo arquivo novamente
+                e.target.value = '';
+            }
+
+            function processTextFile(file) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     try {
@@ -1080,13 +1097,38 @@
                         }
                         
                         updateDisplay();
-                        toggleMenu();
                     } catch (error) {
                         alert('Erro ao ler o arquivo: ' + error.message);
                     }
                 };
                 
                 reader.readAsArrayBuffer(file);
+            }
+
+            async function processPDFFile(file) {
+                processingMessage.style.display = 'block';
+                
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const loadingTask = pdfjsLib.getDocument(arrayBuffer);
+                    const pdf = await loadingTask.promise;
+                    
+                    let fullText = '';
+                    
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        const textItems = textContent.items.map(item => item.str);
+                        fullText += textItems.join(' ') + '\n';
+                    }
+                    
+                    parseTextContent(fullText);
+                    updateDisplay();
+                } catch (error) {
+                    alert('Erro ao processar o PDF: ' + error.message);
+                } finally {
+                    processingMessage.style.display = 'none';
+                }
             }
 
             function exportFile() {
@@ -1205,7 +1247,6 @@
                         return `<span class="highlight">${match}</span>`;
                     });
                     
-                    // Se for o resultado atual, destacamos com uma classe diferente
                     if (isCurrent) {
                         newText = newText.replace(
                             new RegExp(searchTerm, 'i'), 
