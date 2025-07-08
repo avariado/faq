@@ -494,169 +494,676 @@
         }
     </style>
 </head>
-            function showProgressModal(message) {
-                progressModal.querySelector('h2').textContent = message;
-                progressModal.classList.add('active');
-                overlay.classList.add('active');
-                progressBarFill.style.width = '0%';
-                progressText.textContent = '0%';
-            }
+<body>
+    <header>
+        <button id="menu-btn">☰</button>
+        <h1>Leitor Q&A</h1>
+    </header>
 
-            function updateProgress(percent) {
-                progressBarFill.style.width = `${percent}%`;
-                progressText.textContent = `${percent}%`;
-            }
+    <div id="content">
+        <div id="card">
+            <div id="card-content">
+                <div id="question"></div>
+                <div id="answer"></div>
+            </div>
+            <div class="card-footer">
+                <button class="nav-button" id="prev-btn">←</button>
+                <div class="counter-container">
+                    <input type="text" id="current-card-input">
+                    <span id="total-cards">/ 0</span>
+                </div>
+                <button class="nav-button" id="next-btn">→</button>
+            </div>
+        </div>
+    </div>
 
-            function hideProgressModal() {
-                progressModal.classList.remove('active');
-                overlay.classList.remove('active');
-            }
+    <div id="menu">
+        <div class="menu-item" id="import-item">
+            <i>📁</i> Importar
+        </div>
+        <div class="menu-item" id="export-item">
+            <i>💾</i> Exportar
+        </div>
+        <div class="menu-item" id="toggle-mode">
+            <i>🔄</i> Alternar Modo
+        </div>
+        <div class="menu-item" id="edit-item">
+            <i>✏️</i> Editar
+        </div>
+        <div class="menu-item" id="clear-item">
+            <i>🗑️</i> Limpar Tudo
+        </div>
+        <div class="font-size-controls">
+            <button class="font-size-btn" id="decrease-font">-</button>
+            <span id="current-font-size">16</span>
+            <button class="font-size-btn" id="increase-font">+</button>
+        </div>
+        <div class="search-container-wrapper">
+            <div id="search-container">
+                <input type="text" id="search-input" placeholder="Pesquisar...">
+                <div class="search-buttons">
+                    <button class="search-btn" id="search-prev-btn" disabled>↑</button>
+                    <button class="search-btn" id="search-next-btn" disabled>↓</button>
+                    <button class="search-btn" id="clear-search-btn">✕</button>
+                </div>
+                <div class="search-info" id="search-info"></div>
+            </div>
+        </div>
+    </div>
 
-            function exportFile() {
-                if (items.length === 0) return;
+    <div id="overlay"></div>
+
+    <div class="modal" id="edit-modal">
+        <h2>Editar Conteúdo</h2>
+        <textarea id="edit-textarea"></textarea>
+        <div class="modal-buttons">
+            <button class="btn btn-secondary" id="cancel-edit">Cancelar</button>
+            <button class="btn btn-primary" id="save-edit">Salvar</button>
+        </div>
+    </div>
+
+    <div class="modal" id="progress-modal">
+        <h2>Processando Arquivo</h2>
+        <div id="progress-bar">
+            <div id="progress-bar-fill"></div>
+        </div>
+        <div id="progress-text">0%</div>
+    </div>
+
+    <input type="file" id="file-input" accept=".txt,.pdf,.epub">
+    <a id="file-export" download></a>
+
+    <script>
+        // Configuração inicial do PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
+
+        // Elementos do DOM
+        const menuBtn = document.getElementById('menu-btn');
+        const menu = document.getElementById('menu');
+        const overlay = document.getElementById('overlay');
+        const content = document.getElementById('content');
+        const questionEl = document.getElementById('question');
+        const answerEl = document.getElementById('answer');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const currentCardInput = document.getElementById('current-card-input');
+        const totalCardsEl = document.getElementById('total-cards');
+        const importItem = document.getElementById('import-item');
+        const exportItem = document.getElementById('export-item');
+        const toggleMode = document.getElementById('toggle-mode');
+        const editItem = document.getElementById('edit-item');
+        const clearItem = document.getElementById('clear-item');
+        const editModal = document.getElementById('edit-modal');
+        const editTextarea = document.getElementById('edit-textarea');
+        const cancelEdit = document.getElementById('cancel-edit');
+        const saveEdit = document.getElementById('save-edit');
+        const fileInput = document.getElementById('file-input');
+        const fileExport = document.getElementById('file-export');
+        const increaseFont = document.getElementById('increase-font');
+        const decreaseFont = document.getElementById('decrease-font');
+        const currentFontSize = document.getElementById('current-font-size');
+        const searchInput = document.getElementById('search-input');
+        const searchPrevBtn = document.getElementById('search-prev-btn');
+        const searchNextBtn = document.getElementById('search-next-btn');
+        const clearSearchBtn = document.getElementById('clear-search-btn');
+        const searchInfo = document.getElementById('search-info');
+        const progressModal = document.getElementById('progress-modal');
+        const progressBarFill = document.getElementById('progress-bar-fill');
+        const progressText = document.getElementById('progress-text');
+
+        // Variáveis de estado
+        let items = [];
+        let originalItems = [];
+        let currentIndex = 0;
+        let isQAMode = true;
+        let baseFontSize = 16;
+        let searchTerm = '';
+        let searchResults = [];
+        let currentSearchIndex = -1;
+        let isFirstSearchClick = true;
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', () => {
+            // Configurar eventos
+            setupEventListeners();
+            
+            // Carregar estado salvo ou inicializar
+            const savedState = loadState();
+            if (savedState) {
+                items = savedState.items || [];
+                originalItems = savedState.originalItems || [];
+                currentIndex = savedState.currentIndex || 0;
+                isQAMode = savedState.isQAMode !== undefined ? savedState.isQAMode : true;
+                baseFontSize = savedState.baseFontSize || 16;
                 
-                let content;
-                if (isQAMode) {
-                    content = items.map(item => `${item.question}\t${item.answer}`).join('\n');
-                } else {
-                    content = items.map(item => item.text).join('\n');
+                if (items.length > 0) {
+                    updateDisplay();
+                    updateCounter();
                 }
-                
-                const blob = new Blob([content], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                
-                fileExport.href = url;
-                fileExport.download = 'perguntas_respostas.txt';
-                fileExport.click();
-                
-                URL.revokeObjectURL(url);
-                closeMenu(); // Fechar o menu e overlay após exportação
+            } else {
+                // Exemplo inicial
+                items = [
+                    { question: 'Qual é a capital de Portugal?', answer: 'Lisboa' },
+                    { question: 'Quantos planetas tem o sistema solar?', answer: '8' }
+                ];
+                originalItems = [...items];
+                updateDisplay();
+                updateCounter();
             }
             
-            function saveState() {
-                const state = {
-                    items,
-                    originalItems,
-                    currentIndex,
-                    isQAMode,
-                    baseFontSize
+            currentFontSize.textContent = baseFontSize;
+            updateFontSize();
+        });
+
+        function setupEventListeners() {
+            // Menu e overlay
+            menuBtn.addEventListener('click', toggleMenu);
+            overlay.addEventListener('click', closeMenu);
+            
+            // Navegação
+            prevBtn.addEventListener('click', goToPrevCard);
+            nextBtn.addEventListener('click', goToNextCard);
+            currentCardInput.addEventListener('change', goToCard);
+            content.addEventListener('click', toggleAnswer);
+            
+            // Itens do menu
+            importItem.addEventListener('click', () => {
+                fileInput.click();
+                closeMenu();
+            });
+            
+            exportItem.addEventListener('click', () => {
+                exportFile();
+                closeMenu();
+            });
+            
+            toggleMode.addEventListener('click', toggleModeHandler);
+            editItem.addEventListener('click', editCurrentCard);
+            clearItem.addEventListener('click', clearAll);
+            
+            // Modal de edição
+            cancelEdit.addEventListener('click', closeEditModal);
+            saveEdit.addEventListener('click', saveEditHandler);
+            
+            // Importação/exportação
+            fileInput.addEventListener('change', handleFileImport);
+            
+            // Tamanho da fonte
+            increaseFont.addEventListener('click', () => changeFontSize(1));
+            decreaseFont.addEventListener('click', () => changeFontSize(-1));
+            
+            // Pesquisa
+            searchInput.addEventListener('input', performSearch);
+            searchPrevBtn.addEventListener('click', goToPrevSearchResult);
+            searchNextBtn.addEventListener('click', goToNextSearchResult);
+            clearSearchBtn.addEventListener('click', clearSearch);
+            
+            // Teclado
+            document.addEventListener('keydown', handleKeyDown);
+        }
+                // Funções principais
+        function updateDisplay() {
+            if (items.length === 0) {
+                questionEl.textContent = 'Nenhum item para mostrar';
+                answerEl.textContent = '';
+                answerEl.classList.remove('visible');
+                return;
+            }
+
+            const currentItem = items[currentIndex];
+            
+            if (isQAMode) {
+                questionEl.textContent = currentItem.question || '';
+                answerEl.textContent = currentItem.answer || '';
+            } else {
+                questionEl.textContent = currentItem.text || '';
+                answerEl.textContent = '';
+            }
+            
+            highlightText();
+            updateCounter();
+            saveState();
+        }
+
+        function updateCounter() {
+            currentCardInput.value = currentIndex + 1;
+            totalCardsEl.textContent = `/ ${items.length}`;
+        }
+
+        function goToPrevCard() {
+            if (items.length === 0) return;
+            currentIndex = (currentIndex - 1 + items.length) % items.length;
+            updateDisplay();
+        }
+
+        function goToNextCard() {
+            if (items.length === 0) return;
+            currentIndex = (currentIndex + 1) % items.length;
+            updateDisplay();
+        }
+
+        function goToCard() {
+            const newIndex = parseInt(currentCardInput.value) - 1;
+            if (!isNaN(newIndex) {
+                currentIndex = Math.max(0, Math.min(newIndex, items.length - 1));
+                updateDisplay();
+            }
+        }
+
+        function toggleAnswer() {
+            if (isQAMode && items.length > 0) {
+                answerEl.classList.toggle('visible');
+            }
+        }
+
+        function toggleMenu() {
+            menu.classList.toggle('active');
+            overlay.classList.toggle('active');
+        }
+
+        function closeMenu() {
+            menu.classList.remove('active');
+            overlay.classList.remove('active');
+        }
+
+        function toggleModeHandler() {
+            isQAMode = !isQAMode;
+            closeMenu();
+            updateDisplay();
+        }
+
+        function editCurrentCard() {
+            if (items.length === 0) return;
+            
+            const currentItem = items[currentIndex];
+            if (isQAMode) {
+                editTextarea.value = `${currentItem.question}\n---\n${currentItem.answer}`;
+            } else {
+                editTextarea.value = currentItem.text;
+            }
+            
+            editModal.classList.add('active');
+            overlay.classList.add('active');
+            closeMenu();
+        }
+
+        function closeEditModal() {
+            editModal.classList.remove('active');
+            overlay.classList.remove('active');
+        }
+
+        function saveEditHandler() {
+            if (items.length === 0) return;
+            
+            const text = editTextarea.value;
+            if (isQAMode) {
+                const parts = text.split('\n---\n');
+                items[currentIndex] = {
+                    question: parts[0] || '',
+                    answer: parts[1] || ''
                 };
-                localStorage.setItem('appState', JSON.stringify(state));
+            } else {
+                items[currentIndex] = {
+                    text: text
+                };
             }
             
-            function loadState() {
-                const savedState = localStorage.getItem('appState');
-                return savedState ? JSON.parse(savedState) : null;
+            closeEditModal();
+            updateDisplay();
+        }
+
+        function clearAll() {
+            if (confirm('Tem certeza que deseja limpar todos os itens?')) {
+                items = [];
+                originalItems = [];
+                currentIndex = 0;
+                closeMenu();
+                updateDisplay();
+                saveState();
             }
-            
-            function performSearch() {
-                searchTerm = searchInput.value.trim();
-                if (!searchTerm) {
-                    clearSearch();
-                    return;
+        }
+
+        function changeFontSize(change) {
+            baseFontSize = Math.max(12, Math.min(40, baseFontSize + change));
+            currentFontSize.textContent = baseFontSize;
+            updateFontSize();
+            saveState();
+        }
+
+        function updateFontSize() {
+            questionEl.style.fontSize = `${baseFontSize}px`;
+            answerEl.style.fontSize = `${baseFontSize - 2}px`;
+        }
+
+        function handleKeyDown(e) {
+            if (e.key === 'ArrowLeft') {
+                goToPrevCard();
+            } else if (e.key === 'ArrowRight') {
+                goToNextCard();
+            } else if (e.key === ' ' || e.key === 'Spacebar') {
+                toggleAnswer();
+                e.preventDefault();
+            }
+        }
+
+        // Funções de importação/exportação
+        async function handleFileImport(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            showProgressModal('Processando arquivo...');
+
+            try {
+                if (file.name.endsWith('.txt')) {
+                    await importTxtFile(file);
+                } else if (file.name.endsWith('.pdf')) {
+                    await importPdfFile(file);
+                } else if (file.name.endsWith('.epub')) {
+                    await importEpubFile(file);
+                } else {
+                    alert('Formato de arquivo não suportado. Use .txt, .pdf ou .epub');
                 }
+            } catch (error) {
+                console.error('Erro ao importar arquivo:', error);
+                alert('Erro ao processar arquivo: ' + error.message);
+            } finally {
+                hideProgressModal();
+                fileInput.value = ''; // Reset para permitir reimportação do mesmo arquivo
+            }
+        }
+
+        async function importTxtFile(file) {
+            const text = await file.text();
+            const lines = text.split('\n').filter(line => line.trim() !== '');
+            
+            if (isQAMode) {
+                items = [];
+                for (let i = 0; i < lines.length; i += 2) {
+                    const question = lines[i].trim();
+                    const answer = lines[i + 1] ? lines[i + 1].trim() : '';
+                    if (question) {
+                        items.push({ question, answer });
+                    }
+                }
+            } else {
+                items = lines.map(line => ({ text: line.trim() }));
+            }
+            
+            originalItems = [...items];
+            currentIndex = 0;
+            updateDisplay();
+            saveState();
+        }
+
+        async function importPdfFile(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const loadingTask = pdfjsLib.getDocument(arrayBuffer);
+            const pdf = await loadingTask.promise;
+            
+            items = [];
+            const totalPages = pdf.numPages;
+            
+            for (let i = 1; i <= totalPages; i++) {
+                updateProgress(Math.round((i / totalPages) * 100));
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const text = textContent.items.map(item => item.str).join(' ');
                 
-                searchResults = [];
-                
-                for (let i = 0; i < items.length; i++) {
-                    const item = items[i];
-                    let textToSearch = '';
-                    
+                if (text.trim()) {
                     if (isQAMode) {
-                        textToSearch = item.question + ' ' + item.answer;
+                        // Tenta dividir em perguntas e respostas baseado em padrões comuns
+                        const qaPairs = extractQAPairsFromText(text);
+                        items.push(...qaPairs);
                     } else {
-                        textToSearch = item.text;
+                        items.push({ text: cleanText(text) });
                     }
-                    
-                    if (textToSearch.toLowerCase().includes(searchTerm.toLowerCase())) {
-                        searchResults.push(i);
+                }
+            }
+            
+            originalItems = [...items];
+            currentIndex = 0;
+            updateDisplay();
+            saveState();
+        }
+
+        async function importEpubFile(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const book = new Epub(arrayBuffer);
+            
+            items = [];
+            let totalLocations = 0;
+            let processedLocations = 0;
+            
+            await book.ready;
+            totalLocations = book.locations.total;
+            
+            for (const spineItem of book.spine.contents) {
+                const text = await spineItem.load(book.load.bind(book));
+                const clean = cleanText(text);
+                
+                if (clean.trim()) {
+                    if (isQAMode) {
+                        const qaPairs = extractQAPairsFromText(clean);
+                        items.push(...qaPairs);
+                    } else {
+                        items.push({ text: clean });
                     }
                 }
                 
-                if (searchResults.length === 0) {
-                    searchInfo.textContent = 'Nenhum resultado encontrado para: ' + searchTerm;
-                    searchPrevBtn.disabled = true;
-                    searchNextBtn.disabled = true;
-                    return;
-                }
-                
-                currentSearchIndex = 0;
-                currentIndex = searchResults[currentSearchIndex];
-                updateDisplay();
-                updateSearchInfo();
+                processedLocations += spineItem.locations.length;
+                updateProgress(Math.round((processedLocations / totalLocations) * 100));
             }
             
-            function goToPrevSearchResult() {
-                if (searchResults.length === 0) return;
-                
-                currentSearchIndex = (currentSearchIndex - 1 + searchResults.length) % searchResults.length;
-                currentIndex = searchResults[currentSearchIndex];
-                updateDisplay();
-                updateSearchInfo();
-            }
+            originalItems = [...items];
+            currentIndex = 0;
+            updateDisplay();
+            saveState();
+        }
+
+        function extractQAPairsFromText(text) {
+            const qaPairs = [];
+            // Padrões comuns para identificar perguntas e respostas
+            const patterns = [
+                /(Q:|P:|Pergunta:|Question:)\s*(.*?)\s*(A:|R:|Resposta:|Answer:)\s*(.*?)(?=\nQ:|P:|Pergunta:|Question:|$)/gis,
+                /(.*?\?)\s*(.*?)(?=\n.*?\?|$)/gis
+            ];
             
-            function goToNextSearchResult() {
-                if (searchResults.length === 0) return;
-                
-                currentSearchIndex = (currentSearchIndex + 1) % searchResults.length;
-                currentIndex = searchResults[currentSearchIndex];
-                updateDisplay();
-                updateSearchInfo();
-            }
-            
-            function updateSearchInfo() {
-                if (searchResults.length === 0) {
-                    searchInfo.textContent = '';
-                } else {
-                    searchInfo.textContent = `Resultado ${currentSearchIndex + 1} de ${searchResults.length}`;
-                }
-            }
-            
-            function updateSearchButtons() {
-                searchPrevBtn.disabled = searchResults.length === 0 || currentSearchIndex <= 0;
-                searchNextBtn.disabled = searchResults.length === 0 || currentSearchIndex >= searchResults.length - 1;
-            }
-            
-            function highlightText() {
-                if (!searchTerm) return;
-                
-                const highlight = (element, isCurrent) => {
-                    const text = element.textContent;
-                    const regex = new RegExp(searchTerm, 'gi');
-                    
-                    let newText = text.replace(regex, match => {
-                        return `<span class="highlight">${match}</span>`;
-                    });
-                    
-                    if (isCurrent) {
-                        newText = newText.replace(
-                            new RegExp(searchTerm, 'i'), 
-                            match => `<span class="current-highlight">${match}</span>`
-                        );
+            for (const pattern of patterns) {
+                let match;
+                while ((match = pattern.exec(text)) !== null) {
+                    if (match[1] && match[2] && match[3] && match[4]) {
+                        // Padrão Q: ... A: ...
+                        qaPairs.push({ question: cleanText(match[2]), answer: cleanText(match[4]) });
+                    } else if (match[1] && match[2]) {
+                        // Padrão ...? ...
+                        qaPairs.push({ question: cleanText(match[1]), answer: cleanText(match[2]) });
                     }
-                    
-                    element.innerHTML = newText;
-                };
+                }
+                
+                if (qaPairs.length > 0) break; // Se encontrou com um padrão, não tenta os outros
+            }
+            
+            // Se não encontrou padrões, divide por linhas alternadas
+            if (qaPairs.length === 0) {
+                const lines = text.split('\n').filter(line => line.trim() !== '');
+                for (let i = 0; i < lines.length; i += 2) {
+                    const question = lines[i].trim();
+                    const answer = lines[i + 1] ? lines[i + 1].trim() : '';
+                    if (question) {
+                        qaPairs.push({ question, answer });
+                    }
+                }
+            }
+            
+            return qaPairs;
+        }
+
+        function cleanText(text) {
+            // Remove múltiplos espaços, quebras de linha extras, etc.
+            return text.replace(/\s+/g, ' ').trim();
+        }
+                function showProgressModal(message) {
+            progressModal.querySelector('h2').textContent = message;
+            progressModal.classList.add('active');
+            overlay.classList.add('active');
+            progressBarFill.style.width = '0%';
+            progressText.textContent = '0%';
+        }
+
+        function updateProgress(percent) {
+            progressBarFill.style.width = `${percent}%`;
+            progressText.textContent = `${percent}%`;
+        }
+
+        function hideProgressModal() {
+            progressModal.classList.remove('active');
+            overlay.classList.remove('active');
+        }
+
+        function exportFile() {
+            if (items.length === 0) return;
+            
+            let content;
+            if (isQAMode) {
+                content = items.map(item => `${item.question}\t${item.answer}`).join('\n');
+            } else {
+                content = items.map(item => item.text).join('\n');
+            }
+            
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            
+            fileExport.href = url;
+            fileExport.download = 'conteudo_exportado.txt';
+            fileExport.click();
+            
+            URL.revokeObjectURL(url);
+            closeMenu();
+        }
+        
+        function saveState() {
+            const state = {
+                items,
+                originalItems,
+                currentIndex,
+                isQAMode,
+                baseFontSize
+            };
+            localStorage.setItem('appState', JSON.stringify(state));
+        }
+        
+        function loadState() {
+            const savedState = localStorage.getItem('appState');
+            return savedState ? JSON.parse(savedState) : null;
+        }
+        
+        function performSearch() {
+            searchTerm = searchInput.value.trim();
+            if (!searchTerm) {
+                clearSearch();
+                return;
+            }
+            
+            searchResults = [];
+            
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                let textToSearch = '';
                 
                 if (isQAMode) {
-                    highlight(questionEl, true);
-                    highlight(answerEl, true);
+                    textToSearch = item.question + ' ' + item.answer;
                 } else {
-                    highlight(questionEl, true);
+                    textToSearch = item.text;
+                }
+                
+                if (textToSearch.toLowerCase().includes(searchTerm.toLowerCase())) {
+                    searchResults.push(i);
                 }
             }
             
-            function clearSearch() {
-                searchTerm = '';
-                searchResults = [];
-                currentSearchIndex = -1;
-                searchInfo.textContent = '';
+            if (searchResults.length === 0) {
+                searchInfo.textContent = 'Nenhum resultado encontrado para: ' + searchTerm;
                 searchPrevBtn.disabled = true;
                 searchNextBtn.disabled = true;
-                isFirstSearchClick = true;
-                updateDisplay();
+                return;
             }
-        });
+            
+            currentSearchIndex = 0;
+            currentIndex = searchResults[currentSearchIndex];
+            updateDisplay();
+            updateSearchInfo();
+        }
+        
+        function goToPrevSearchResult() {
+            if (searchResults.length === 0) return;
+            
+            currentSearchIndex = (currentSearchIndex - 1 + searchResults.length) % searchResults.length;
+            currentIndex = searchResults[currentSearchIndex];
+            updateDisplay();
+            updateSearchInfo();
+        }
+        
+        function goToNextSearchResult() {
+            if (searchResults.length === 0) return;
+            
+            currentSearchIndex = (currentSearchIndex + 1) % searchResults.length;
+            currentIndex = searchResults[currentSearchIndex];
+            updateDisplay();
+            updateSearchInfo();
+        }
+        
+        function updateSearchInfo() {
+            if (searchResults.length === 0) {
+                searchInfo.textContent = '';
+            } else {
+                searchInfo.textContent = `Resultado ${currentSearchIndex + 1} de ${searchResults.length}`;
+            }
+        }
+        
+        function updateSearchButtons() {
+            searchPrevBtn.disabled = searchResults.length === 0 || currentSearchIndex <= 0;
+            searchNextBtn.disabled = searchResults.length === 0 || currentSearchIndex >= searchResults.length - 1;
+        }
+        
+        function highlightText() {
+            if (!searchTerm) return;
+            
+            const highlight = (element, isCurrent) => {
+                const text = element.textContent;
+                const regex = new RegExp(searchTerm, 'gi');
+                
+                let newText = text.replace(regex, match => {
+                    return `<span class="highlight">${match}</span>`;
+                });
+                
+                if (isCurrent) {
+                    newText = newText.replace(
+                        new RegExp(searchTerm, 'i'), 
+                        match => `<span class="current-highlight">${match}</span>`
+                    );
+                }
+                
+                element.innerHTML = newText;
+            };
+            
+            if (isQAMode) {
+                highlight(questionEl, true);
+                highlight(answerEl, true);
+            } else {
+                highlight(questionEl, true);
+            }
+        }
+        
+        function clearSearch() {
+            searchTerm = '';
+            searchResults = [];
+            currentSearchIndex = -1;
+            searchInfo.textContent = '';
+            searchPrevBtn.disabled = true;
+            searchNextBtn.disabled = true;
+            isFirstSearchClick = true;
+            updateDisplay();
+        }
     </script>
     <script>
         if ('serviceWorker' in navigator) {
