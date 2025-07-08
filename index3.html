@@ -645,7 +645,7 @@
             updateFontSize();
 
             menuBtn.addEventListener('click', toggleMenu);
-            overlay.addEventListener('click', toggleMenu);
+            overlay.addEventListener('click', closeMenu);
             saveEditBtn.addEventListener('click', saveContent);
             cancelEditBtn.addEventListener('click', closeEditModal);
             importFileBtn.addEventListener('click', () => fileInput.click());
@@ -791,7 +791,7 @@
                     }
                 } else if (e.key === 'Escape') {
                     if (menu.classList.contains('active')) {
-                        toggleMenu();
+                        closeMenu();
                     }
                 } else if (e.key === 'f' && (e.ctrlKey || e.metaKey)) {
                     e.preventDefault();
@@ -805,8 +805,13 @@
                 overlay.classList.toggle('active');
             }
 
+            function closeMenu() {
+                menu.classList.remove('active');
+                overlay.classList.remove('active');
+            }
+
             function openEditModal() {
-                toggleMenu();
+                closeMenu();
                 contentEditor.value = isQAMode 
                     ? items.map(item => `${item.question}\t${item.answer}`).join('\n')
                     : items.map(item => item.text).join('\n');
@@ -1052,7 +1057,7 @@
                 
                 currentIndex = 0;
                 updateDisplay();
-                toggleMenu();
+                closeMenu();
                 saveState();
             }
 
@@ -1061,7 +1066,7 @@
                 items = [...originalItems];
                 currentIndex = 0;
                 updateDisplay();
-                toggleMenu();
+                closeMenu();
                 saveState();
             }
 
@@ -1138,7 +1143,7 @@
                         }
                         
                         updateDisplay();
-                        toggleMenu(); // Fechar o menu após importação
+                        closeMenu(); // Fechar o menu e overlay após importação
                     } catch (error) {
                         alert('Erro ao ler o arquivo: ' + error.message);
                     }
@@ -1182,7 +1187,7 @@
                             parseTextContent(fullText);
                             updateDisplay();
                             hideProgressModal();
-                            toggleMenu(); // Fechar o menu após importação
+                            closeMenu(); // Fechar o menu e overlay após importação
                         }).catch(function(error) {
                             hideProgressModal();
                             alert('Erro ao processar PDF: ' + error.message);
@@ -1257,7 +1262,7 @@
                         updateDisplay();
                         hideProgressModal();
                         URL.revokeObjectURL(url);
-                        toggleMenu(); // Fechar o menu após importação
+                        closeMenu(); // Fechar o menu e overlay após importação
                     }).catch(function(error) {
                         hideProgressModal();
                         URL.revokeObjectURL(url);
@@ -1303,7 +1308,7 @@
                 fileExport.click();
                 
                 URL.revokeObjectURL(url);
-                toggleMenu(); // Fechar o menu após exportação
+                closeMenu(); // Fechar o menu e overlay após exportação
             }
             
             function saveState() {
