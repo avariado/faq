@@ -529,7 +529,6 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.12.313/pdf.min.js"></script>
     <script>
-        // Configuração do PDF.js para evitar problemas com CORS
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.12.313/pdf.worker.min.js';
 
         function adjustViewport() {
@@ -1088,62 +1087,8 @@
                 reader.readAsArrayBuffer(file);
             }
 
-            function handlePdfImport(e) {
+            function handleFileImport(e) {
                 const file = e.target.files[0];
-                if (!file) return;
-                
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const typedarray = new Uint8Array(e.target.result);
-                    
-                    // Carrega o PDF
-                    pdfjsLib.getDocument(typedarray).promise.then(function(pdf) {
-                        let pdfText = '';
-                        const totalPages = pdf.numPages;
-                        const pagePromises = [];
-                        
-                        // Processa cada página do PDF
-                        for (let i = 1; i <= totalPages; i++) {
-                            pagePromises.push(
-                                pdf.getPage(i).then(function(page) {
-                                    return page.getTextContent().then(function(textContent) {
-                                        let pageText = '';
-                                        for (const item of textContent.items) {
-                                            pageText += item.str + ' ';
-                                        }
-                                        return pageText;
-                                    });
-                                })
-                            );
-                        }
-                        
-                        // Combina o texto de todas as páginas
-                        Promise.all(pagePromises).then(function(pagesText) {
-                            pdfText = pagesText.join('\n');
-                            
-                            // Processa o texto extraído
-                            const hasTabs = pdfText.includes('\t');
-                            const hasDoubleSemicolon = pdfText.includes(';;');
-                            const isAlternatingLines = checkAlternatingLinesFormat(pdfText);
-                            
-                            if (hasTabs || hasDoubleSemicolon) {
-                                parseQAContent(pdfText);
-                            } else if (isAlternatingLines) {
-                                parseAlternatingLinesContent(pdfText);
-                            } else {
-                                parseTextContent(pdfText);
-                            }
-                            
-                            updateDisplay();
-                            toggleMenu();
-                        });
-                    }).catch(function(error) {
-                        alert('Erro ao processar o PDF: ' + error.message);
-                    });
-                };
-                
-                reader.readAsArrayBuffer(file);
-            }
                         function exportFile() {
                 if (items.length === 0) return;
                 
