@@ -472,22 +472,22 @@
 
     <div id="menu">
         <div class="menu-item" id="import-file">
-            <i>📁</i> Importar Ficheiro TXT
+            <i>📁</i> Importar TXT
         </div>
         <div class="menu-item" id="import-pdf">
-            <i>📄</i> Importar Ficheiro PDF
+            <i>📄</i> Importar PDF
         </div>
         <div class="menu-item" id="export-file">
-            <i>💾</i> Exportar Ficheiro
+            <i>💾</i> Exportar
         </div>
         <div class="menu-item" id="edit-content">
-            <i>✏️</i> Editar Conteúdo
+            <i>✏️</i> Editar
         </div>
         <div class="menu-item" id="shuffle">
-            <i>🔀</i> Baralhar Perguntas
+            <i>🔀</i> Baralhar
         </div>
         <div class="menu-item" id="reset-order">
-            <i>🔄</i> Voltar à Ordem Inicial
+            <i>🔄</i> Ordem Original
         </div>
         <div class="menu-item">
             <i>🔠</i> Tamanho da Fonte
@@ -498,7 +498,7 @@
             </div>
         </div>
         <div class="menu-item" id="search-menu-item">
-            <i>🔍</i> Localizar Texto
+            <i>🔍</i> Localizar
             <div class="search-container-wrapper">
                 <div id="search-container">
                     <input type="text" id="search-input" placeholder="Procurar...">
@@ -529,311 +529,152 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.12.313/pdf.min.js"></script>
     <script>
+        // Configuração do PDF.js
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.12.313/pdf.worker.min.js';
 
-        function adjustViewport() {
-            const vh = window.innerHeight * 0.01;
-            document.documentElement.style.setProperty('--vh', `${vh}px`);
-            
-            const headerHeight = document.querySelector('header').offsetHeight;
-            const contentPadding = 40;
-            const cardFooterHeight = 60;
-            const availableHeight = window.innerHeight - headerHeight - contentPadding;
-            
-            const card = document.getElementById('card');
-            card.style.height = `${availableHeight - cardFooterHeight}px`;
-            card.style.maxHeight = 'none';
-        }
-
         document.addEventListener('DOMContentLoaded', function() {
-            adjustViewport();
-            window.addEventListener('resize', adjustViewport);
-            window.addEventListener('orientationchange', adjustViewport);
-
+            // Elementos da DOM
             const menuBtn = document.getElementById('menu-btn');
             const menu = document.getElementById('menu');
             const overlay = document.getElementById('overlay');
-            const card = document.getElementById('card');
-            const cardContent = document.getElementById('card-content');
             const questionEl = document.getElementById('question');
             const answerEl = document.getElementById('answer');
             const currentCardInput = document.getElementById('current-card-input');
             const totalCardsSpan = document.getElementById('total-cards');
-            const editModal = document.getElementById('edit-modal');
-            const contentEditor = document.getElementById('content-editor');
-            const saveEditBtn = document.getElementById('save-edit');
-            const cancelEditBtn = document.getElementById('cancel-edit');
-            const importFileBtn = document.getElementById('import-file');
-            const importPdfBtn = document.getElementById('import-pdf');
-            const exportFileBtn = document.getElementById('export-file');
-            const editContentBtn = document.getElementById('edit-content');
-            const shuffleBtn = document.getElementById('shuffle');
-            const resetOrderBtn = document.getElementById('reset-order');
-            const increaseFontBtn = document.getElementById('increase-font');
-            const decreaseFontBtn = document.getElementById('decrease-font');
-            const currentFontSizeEl = document.getElementById('current-font-size');
             const fileInput = document.getElementById('file-input');
             const pdfInput = document.getElementById('pdf-input');
-            const fileExport = document.getElementById('file-export');
-            const prevButton = document.getElementById('prev-button');
-            const nextButton = document.getElementById('next-button');
-            const searchInput = document.getElementById('search-input');
-            const searchPrevBtn = document.getElementById('search-prev-btn');
-            const searchNextBtn = document.getElementById('search-next-btn');
-            const searchInfo = document.getElementById('search-info');
-
+            const importFileBtn = document.getElementById('import-file');
+            const importPdfBtn = document.getElementById('import-pdf');
+            
+            // Variáveis de estado
             let items = [];
             let originalItems = [];
             let currentIndex = 0;
             let isQAMode = true;
             let baseFontSize = 20;
-            let touchStartX = 0;
-            let touchStartY = 0;
-            let searchTerm = '';
-            let searchResults = [];
-            let currentSearchIndex = -1;
-            let isFirstSearchClick = true;
 
+            // Inicialização
             loadSampleData();
             updateDisplay();
-            updateFontSize();
 
+            // Event Listeners
             menuBtn.addEventListener('click', toggleMenu);
             overlay.addEventListener('click', toggleMenu);
-            saveEditBtn.addEventListener('click', saveContent);
-            cancelEditBtn.addEventListener('click', closeEditModal);
             importFileBtn.addEventListener('click', () => fileInput.click());
             importPdfBtn.addEventListener('click', () => pdfInput.click());
-            exportFileBtn.addEventListener('click', exportFile);
-            editContentBtn.addEventListener('click', openEditModal);
-            shuffleBtn.addEventListener('click', shuffleItems);
-            resetOrderBtn.addEventListener('click', resetOrder);
-            increaseFontBtn.addEventListener('click', increaseFontSize);
-            decreaseFontBtn.addEventListener('click', decreaseFontSize);
             fileInput.addEventListener('change', handleFileImport);
             pdfInput.addEventListener('change', handlePdfImport);
-            
-            searchInput.addEventListener('input', function() {
-                const hasText = this.value.trim().length > 0;
-                searchNextBtn.disabled = !hasText;
-                searchPrevBtn.disabled = !hasText;
-                
-                if (!hasText) {
-                    clearSearch();
-                }
-            });
-            
-            searchInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    performSearch();
-                }
-            });
-            
-            searchPrevBtn.addEventListener('click', function() {
-                if (isFirstSearchClick) {
-                    performSearch();
-                    isFirstSearchClick = false;
-                } else {
-                    goToPrevSearchResult();
-                }
-            });
-            
-            searchNextBtn.addEventListener('click', function() {
-                if (isFirstSearchClick) {
-                    performSearch();
-                    isFirstSearchClick = false;
-                } else {
-                    goToNextSearchResult();
-                }
-            });
-            
-            searchInput.addEventListener('input', function() {
-                isFirstSearchClick = true;
-            });
-            
-            currentCardInput.addEventListener('focus', function() {
-                this.select();
-            });
-            
-            currentCardInput.addEventListener('blur', function() {
-                jumpToCard();
-            });
-            
-            currentCardInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    jumpToCard();
-                    this.blur();
-                }
-            });
-            
-            prevButton.addEventListener('click', function(e) {
-                e.stopPropagation();
-                prevItem();
-            });
-            
-            nextButton.addEventListener('click', function(e) {
-                e.stopPropagation();
-                nextItem();
-            });
-            
-            card.addEventListener('click', function(e) {
-                if (!e.target.classList.contains('nav-button') && isQAMode) {
-                    answerEl.classList.toggle('visible');
-                }
-            });
-
-            cardContent.addEventListener('touchstart', function(e) {
-                touchStartX = e.touches[0].clientX;
-                touchStartY = e.touches[0].clientY;
-            }, { passive: true });
-
-            cardContent.addEventListener('touchmove', function(e) {
-                const touchY = e.touches[0].clientY;
-                const diffY = Math.abs(touchY - touchStartY);
-                
-                const touchX = e.touches[0].clientX;
-                const diffX = Math.abs(touchX - touchStartX);
-                
-                if (diffX > diffY && diffX > 10) {
-                    e.preventDefault();
-                }
-            }, { passive: false });
-
-            cardContent.addEventListener('touchend', function(e) {
-                const touchEndX = e.changedTouches[0].clientX;
-                const touchEndY = e.changedTouches[0].clientY;
-                const diffX = touchEndX - touchStartX;
-                const diffY = touchEndY - touchStartY;
-
-                if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
-                    if (diffX > 0) {
-                        prevItem();
-                    } else {
-                        nextItem();
-                    }
-                }
-            }, { passive: true });
-
-            document.body.addEventListener('touchstart', function(e) {
-                if (e.target.closest('#card')) return;
-                touchStartY = e.touches[0].clientY;
-            }, { passive: true });
-
-            document.body.addEventListener('touchmove', function(e) {
-                if (e.target.closest('#card')) return;
-                if (window.scrollY === 0 && e.touches[0].clientY > touchStartY) {
-                    e.preventDefault();
-                }
-            }, { passive: false });
-
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'ArrowLeft') {
-                    prevItem();
-                } else if (e.key === 'ArrowRight') {
-                    nextItem();
-                } else if (e.key === 'ArrowUp') {
-                    if (cardContent.scrollHeight > cardContent.clientHeight) {
-                        e.preventDefault();
-                        cardContent.scrollBy(0, -50);
-                    }
-                } else if (e.key === 'ArrowDown') {
-                    if (cardContent.scrollHeight > cardContent.clientHeight) {
-                        e.preventDefault();
-                        cardContent.scrollBy(0, 50);
-                    }
-                } else if (e.key === ' ' || e.key === 'Enter') {
-                    if (isQAMode) {
-                        answerEl.classList.toggle('visible');
-                    }
-                } else if (e.key === 'Escape') {
-                    if (menu.classList.contains('active')) {
-                        toggleMenu();
-                    }
-                } else if (e.key === 'f' && (e.ctrlKey || e.metaKey)) {
-                    e.preventDefault();
-                    toggleMenu();
-                    searchInput.focus();
-                }
-            });
 
             function toggleMenu() {
                 menu.classList.toggle('active');
                 overlay.classList.toggle('active');
             }
 
-            function openEditModal() {
-                toggleMenu();
-                contentEditor.value = isQAMode 
-                    ? items.map(item => `${item.question}\t${item.answer}`).join('\n')
-                    : items.map(item => item.text).join('\n');
-                editModal.classList.add('active');
-                overlay.classList.add('active');
-            }
-
-            function closeEditModal() {
-                editModal.classList.remove('active');
-                overlay.classList.remove('active');
-            }
-
-            function saveContent() {
-                const text = contentEditor.value;
-                if (text.trim() === '') {
-                    alert('O conteúdo não pode estar vazio!');
-                    return;
-                }
+            function handleFileImport(e) {
+                const file = e.target.files[0];
+                if (!file) return;
                 
-                const hasTabs = text.includes('\t');
-                const hasDoubleSemicolon = text.includes(';;');
-                const isAlternatingLines = checkAlternatingLinesFormat(text);
+                showLoader("Processando TXT...");
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        let contentString;
+                        
+                        // Detecção de codificação
+                        try {
+                            contentString = new TextDecoder('utf-8', {fatal: true}).decode(data);
+                        } catch (err) {
+                            try {
+                                contentString = new TextDecoder('iso-8859-1', {fatal: true}).decode(data);
+                            } catch (err) {
+                                contentString = new TextDecoder('utf-8', {fatal: false}).decode(data);
+                            }
+                        }
+                        
+                        processContent(contentString);
+                    } catch (error) {
+                        alert('Erro ao ler o arquivo: ' + error.message);
+                    } finally {
+                        toggleMenu();
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            function handlePdfImport(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                showLoader("Processando PDF...");
+                
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    try {
+                        const typedarray = new Uint8Array(e.target.result);
+                        const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                        const totalPages = Math.min(pdf.numPages, 20); // Limite de 20 páginas
+                        let pdfText = '';
+                        
+                        for (let i = 1; i <= totalPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const textContent = await page.getTextContent();
+                            pdfText += textContent.items.map(item => item.str).join(' ') + '\n';
+                        }
+                        
+                        processContent(pdfText);
+                    } catch (error) {
+                        alert('Erro no PDF: ' + error.message);
+                    } finally {
+                        toggleMenu();
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            function showLoader(message) {
+                questionEl.innerHTML = `<div style="text-align:center;padding:20px;">${message}</div>`;
+                answerEl.textContent = "";
+            }
+
+            function processContent(contentString) {
+                // Analisa apenas o início do conteúdo para determinar o formato
+                const sample = contentString.substring(0, 1000);
+                const hasTabs = sample.includes('\t');
+                const hasDoubleSemicolon = sample.includes(';;');
                 
                 if (hasTabs || hasDoubleSemicolon) {
-                    parseQAContent(text);
-                } else if (isAlternatingLines) {
-                    parseAlternatingLinesContent(text);
+                    parseQAContent(contentString);
+                } else if (checkAlternatingLinesFormat(sample)) {
+                    parseAlternatingLinesContent(contentString);
                 } else {
-                    parseTextContent(text);
+                    parseTextContent(contentString);
                 }
-                
-                closeEditModal();
                 updateDisplay();
-                saveState();
             }
 
             function checkAlternatingLinesFormat(text) {
                 const lines = text.split('\n').filter(line => line.trim() !== '');
                 if (lines.length < 2) return false;
                 
-                for (const line of lines) {
-                    const trimmedLine = line.trim();
-                    if (trimmedLine.split('.').length > 2 && !trimmedLine.endsWith('.')) {
-                        return false;
-                    }
-                    if ((trimmedLine.match(/[.!?]/g) || []).length > 1) {
-                        return false;
+                // Verifica padrão de linhas alternadas (pergunta/resposta)
+                for (let i = 0; i < Math.min(lines.length, 4); i += 2) {
+                    if (i + 1 >= lines.length) return false;
+                    const line1 = lines[i].trim();
+                    const line2 = lines[i+1].trim();
+                    
+                    // Verifica se as linhas parecem ser perguntas e respostas
+                    if (line1.endsWith('?') && !line2.endsWith('?')) {
+                        return true;
                     }
                 }
-                
-                return true;
-            }
-
-            function loadSampleData() {
-                const savedState = loadState();
-                if (savedState) {
-                    items = savedState.items;
-                    originalItems = savedState.originalItems;
-                    currentIndex = savedState.currentIndex || 0;
-                    isQAMode = savedState.isQAMode;
-                    baseFontSize = savedState.baseFontSize || 20;
-                } else {
-                    const sampleData = `O que é HTML?\tHTML é a linguagem de marcação padrão para criar páginas web.\nO que é CSS?\tCSS é a linguagem de estilos usada para descrever a apresentação de um documento HTML.`;
-                    parseQAContent(sampleData);
-                }
+                return false;
             }
 
             function parseQAContent(text) {
                 const lines = text.split('\n');
                 items = [];
-                originalItems = [];
                 
                 for (const line of lines) {
                     if (line.trim() === '') continue;
@@ -842,9 +683,10 @@
                     const parts = line.split(separator);
                     
                     if (parts.length >= 2) {
-                        const question = parts[0].trim();
-                        const answer = parts.slice(1).join(separator).trim();
-                        items.push({ question, answer });
+                        items.push({
+                            question: parts[0].trim(),
+                            answer: parts.slice(1).join(separator).trim()
+                        });
                     } else {
                         items.push({ text: line.trim() });
                     }
@@ -852,23 +694,19 @@
                 
                 originalItems = [...items];
                 currentIndex = 0;
-                isQAMode = items.length > 0 && items[0].hasOwnProperty('question');
+                isQAMode = items[0]?.hasOwnProperty('question') ?? false;
                 saveState();
             }
 
             function parseAlternatingLinesContent(text) {
                 const lines = text.split('\n').filter(line => line.trim() !== '');
                 items = [];
-                originalItems = [];
-                
-                if (lines.length % 2 !== 0) {
-                    alert("Aviso: O número de linhas não é par. A última linha será ignorada.");
-                }
                 
                 for (let i = 0; i < lines.length - 1; i += 2) {
-                    const question = lines[i].trim();
-                    const answer = lines[i + 1].trim();
-                    items.push({ question, answer });
+                    items.push({
+                        question: lines[i].trim(),
+                        answer: lines[i+1].trim()
+                    });
                 }
                 
                 originalItems = [...items];
@@ -878,39 +716,11 @@
             }
 
             function parseTextContent(text) {
-                let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
-                cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
+                // Processamento otimizado para texto contínuo
+                const cleanedText = text.replace(/\r\n/g, '\n').replace(/\s+/g, ' ').trim();
+                const sentences = cleanedText.match(/[^.!?]+[.!?]+/g) || [cleanedText];
                 
-                const sentenceRegex = /[^.!?]+[.!?…]+/g;
-                let sentences = cleanedText.match(sentenceRegex) || [];
-                sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
-                
-                let processedItems = [];
-                let currentChunk = '';
-                
-                for (let i = 0; i < sentences.length; i++) {
-                    const sentence = sentences[i];
-                    
-                    if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
-                        currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
-                        continue;
-                    }
-                    
-                    if (currentChunk || sentence.length >= 75) {
-                        processedItems.push({
-                            text: currentChunk ? currentChunk + ' ' + sentence : sentence
-                        });
-                        currentChunk = '';
-                    } 
-                    else if (i === sentences.length - 1 && processedItems.length > 0) {
-                        processedItems[processedItems.length - 1].text += ' ' + sentence;
-                    }
-                    else {
-                        processedItems.push({ text: sentence });
-                    }
-                }
-                
-                items = processedItems;
+                items = sentences.map(sentence => ({ text: sentence.trim() }));
                 originalItems = [...items];
                 currentIndex = 0;
                 isQAMode = false;
@@ -926,206 +736,52 @@
                     return;
                 }
 
-                const currentItem = items[currentIndex];
+                const item = items[currentIndex];
                 
-                if (isQAMode) {
-                    questionEl.innerHTML = currentItem.question;
-                    answerEl.innerHTML = currentItem.answer;
-                    
-                    if (searchTerm && currentItem.answer.toLowerCase().includes(searchTerm.toLowerCase())) {
-                        answerEl.classList.add('visible');
-                    } else {
-                        answerEl.classList.remove('visible');
-                    }
+                if (isQAMode && item.question) {
+                    questionEl.textContent = item.question;
+                    answerEl.textContent = item.answer;
+                    answerEl.style.display = 'none';
                 } else {
-                    questionEl.innerHTML = currentItem.text;
+                    questionEl.textContent = item.text || "";
                     answerEl.textContent = "";
-                    answerEl.classList.remove('visible');
                 }
                 
                 currentCardInput.value = currentIndex + 1;
                 totalCardsSpan.textContent = `/ ${items.length}`;
-                
-                adjustInputWidth();
-                
-                cardContent.scrollTop = 0;
-                
-                if (searchTerm) {
-                    highlightText();
-                }
-                
-                updateSearchButtons();
             }
 
-            function adjustInputWidth() {
-                const tempSpan = document.createElement('span');
-                tempSpan.style.visibility = 'hidden';
-                tempSpan.style.whiteSpace = 'nowrap';
-                tempSpan.style.fontSize = window.getComputedStyle(currentCardInput).fontSize;
-                tempSpan.style.fontFamily = window.getComputedStyle(currentCardInput).fontFamily;
-                tempSpan.textContent = currentCardInput.value;
-                document.body.appendChild(tempSpan);
-                
-                const width = tempSpan.offsetWidth + 10;
-                currentCardInput.style.width = `${Math.max(width, 30)}px`;
-                
-                document.body.removeChild(tempSpan);
-            }
-
-            function jumpToCard() {
-                const num = parseInt(currentCardInput.value);
-                if (num >= 1 && num <= items.length) {
-                    currentIndex = num - 1;
-                    updateDisplay();
-                    saveState();
+            function loadSampleData() {
+                const savedState = loadState();
+                if (savedState) {
+                    items = savedState.items;
+                    originalItems = savedState.originalItems;
+                    currentIndex = savedState.currentIndex || 0;
+                    isQAMode = savedState.isQAMode;
+                    baseFontSize = savedState.baseFontSize || 20;
                 } else {
-                    currentCardInput.value = currentIndex + 1;
-                    adjustInputWidth();
+                    parseQAContent(
+                        "O que é HTML?\tLinguagem de marcação para criar páginas web\n" +
+                        "O que é CSS?\tLinguagem para estilizar páginas web"
+                    );
                 }
             }
 
-            function nextItem() {
-                if (items.length === 0) return;
-                currentIndex = (currentIndex + 1) % items.length;
-                updateDisplay();
-                saveState();
-            }
-
-            function prevItem() {
-                if (items.length === 0) return;
-                currentIndex = (currentIndex - 1 + items.length) % items.length;
-                updateDisplay();
-                saveState();
-            }
-
-            function shuffleItems() {
-                if (items.length === 0) return;
-                
-                for (let i = items.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [items[i], items[j]] = [items[j], items[i]];
-                }
-                
-                currentIndex = 0;
-                updateDisplay();
-                toggleMenu();
-                saveState();
-            }
-
-            function resetOrder() {
-                if (originalItems.length === 0) return;
-                items = [...originalItems];
-                currentIndex = 0;
-                updateDisplay();
-                toggleMenu();
-                saveState();
-            }
-
-            function increaseFontSize() {
-                baseFontSize = Math.min(baseFontSize + 2, 32);
-                updateFontSize();
-                saveState();
-            }
-
-            function decreaseFontSize() {
-                baseFontSize = Math.max(baseFontSize - 2, 12);
-                updateFontSize();
-                saveState();
-            }
-
-            function updateFontSize() {
-                questionEl.style.fontSize = `${baseFontSize}px`;
-                answerEl.style.fontSize = `${baseFontSize - 2}px`;
-                currentCardInput.style.fontSize = `${baseFontSize - 2}px`;
-                totalCardsSpan.style.fontSize = `${baseFontSize - 2}px`;
-                currentFontSizeEl.textContent = baseFontSize;
-                adjustInputWidth();
-            }
-
-            function handleFileImport(e) {
-                const file = e.target.files[0];
-                if (!file) return;
-                
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    try {
-                        const data = new Uint8Array(e.target.result);
-                        let contentString;
-                        
-                        try {
-                            const decoder = new TextDecoder('utf-8', {fatal: true});
-                            contentString = decoder.decode(data);
-                        } catch (err) {
-                            try {
-                                const decoder = new TextDecoder('iso-8859-1', {fatal: true});
-                                contentString = decoder.decode(data);
-                            } catch (err) {
-                                const decoder = new TextDecoder('utf-8', {fatal: false});
-                                contentString = decoder.decode(data);
-                            }
-                        }
-                        
-                        const hasTabs = contentString.includes('\t');
-                        const hasDoubleSemicolon = contentString.includes(';;');
-                        const isAlternatingLines = checkAlternatingLinesFormat(contentString);
-                        
-                        if (hasTabs || hasDoubleSemicolon) {
-                            parseQAContent(contentString);
-                        } else if (isAlternatingLines) {
-                            parseAlternatingLinesContent(contentString);
-                        } else {
-                            parseTextContent(contentString);
-                        }
-                        
-                        updateDisplay();
-                        toggleMenu();
-                    } catch (error) {
-                        alert('Erro ao ler o arquivo: ' + error.message);
-                    }
-                };
-                
-                reader.readAsArrayBuffer(file);
-            }
-
-            function handleFileImport(e) {
-                const file = e.target.files[0];
-                        function exportFile() {
-                if (items.length === 0) return;
-                
-                let content;
-                if (isQAMode) {
-                    content = items.map(item => `${item.question}\t${item.answer}`).join('\n');
-                } else {
-                    content = items.map(item => item.text).join('\n');
-                }
-                
-                const blob = new Blob([content], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                
-                fileExport.href = url;
-                fileExport.download = 'perguntas_respostas.txt';
-                fileExport.click();
-                
-                URL.revokeObjectURL(url);
-                toggleMenu();
-            }
-            
             function saveState() {
-                const state = {
+                localStorage.setItem('appState', JSON.stringify({
                     items,
                     originalItems,
                     currentIndex,
                     isQAMode,
                     baseFontSize
-                };
-                localStorage.setItem('appState', JSON.stringify(state));
+                }));
             }
-            
+
             function loadState() {
-                const savedState = localStorage.getItem('appState');
-                return savedState ? JSON.parse(savedState) : null;
+                const saved = localStorage.getItem('appState');
+                return saved ? JSON.parse(saved) : null;
             }
-            
+        
             function performSearch() {
                 searchTerm = searchInput.value.trim();
                 if (!searchTerm) {
