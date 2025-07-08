@@ -8,7 +8,6 @@
     <link rel="icon" href="/faq/icon-192x192.png">
     <title>Leitor Q&A</title>
     <style>
-        /* Mantido o mesmo CSS anterior */
         * {
             box-sizing: border-box;
             margin: 0;
@@ -347,6 +346,10 @@
             display: none;
         }
 
+        #pdf-input {
+            display: none;
+        }
+
         #file-export {
             display: none;
         }
@@ -417,38 +420,6 @@
             text-align: center;
         }
 
-        #loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-            color: white;
-            font-size: 20px;
-            display: none;
-        }
-
-        .spinner {
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top: 4px solid #fff;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin-bottom: 15px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
         @media (max-width: 600px) {
             #menu {
                 width: 80%;
@@ -499,15 +470,12 @@
         </div>
     </div>
 
-    <!-- Overlay de carregamento -->
-    <div id="loading-overlay">
-        <div class="spinner"></div>
-        <div id="loading-text">A processar ficheiro...</div>
-    </div>
-
     <div id="menu">
         <div class="menu-item" id="import-file">
-            <i>📁</i> Importar Ficheiro
+            <i>📁</i> Importar Ficheiro TXT
+        </div>
+        <div class="menu-item" id="import-pdf">
+            <i>📄</i> Importar Ficheiro PDF
         </div>
         <div class="menu-item" id="export-file">
             <i>💾</i> Exportar Ficheiro
@@ -555,14 +523,15 @@
         </div>
     </div>
 
-    <input type="file" id="file-input" accept=".txt,.pdf">
+    <input type="file" id="file-input" accept=".txt">
+    <input type="file" id="pdf-input" accept=".pdf">
     <a id="file-export" download="perguntas_respostas.txt"></a>
 
-    <!-- Bibliotecas para processamento de PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.12.313/pdf.min.js"></script>
     <script>
+        // Configuração do PDF.js para evitar problemas com CORS
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.12.313/pdf.worker.min.js';
+
         function adjustViewport() {
             const vh = window.innerHeight * 0.01;
             document.documentElement.style.setProperty('--vh', `${vh}px`);
@@ -596,6 +565,7 @@
             const saveEditBtn = document.getElementById('save-edit');
             const cancelEditBtn = document.getElementById('cancel-edit');
             const importFileBtn = document.getElementById('import-file');
+            const importPdfBtn = document.getElementById('import-pdf');
             const exportFileBtn = document.getElementById('export-file');
             const editContentBtn = document.getElementById('edit-content');
             const shuffleBtn = document.getElementById('shuffle');
@@ -604,6 +574,7 @@
             const decreaseFontBtn = document.getElementById('decrease-font');
             const currentFontSizeEl = document.getElementById('current-font-size');
             const fileInput = document.getElementById('file-input');
+            const pdfInput = document.getElementById('pdf-input');
             const fileExport = document.getElementById('file-export');
             const prevButton = document.getElementById('prev-button');
             const nextButton = document.getElementById('next-button');
@@ -611,8 +582,6 @@
             const searchPrevBtn = document.getElementById('search-prev-btn');
             const searchNextBtn = document.getElementById('search-next-btn');
             const searchInfo = document.getElementById('search-info');
-            const loadingOverlay = document.getElementById('loading-overlay');
-            const loadingText = document.getElementById('loading-text');
 
             let items = [];
             let originalItems = [];
@@ -635,6 +604,7 @@
             saveEditBtn.addEventListener('click', saveContent);
             cancelEditBtn.addEventListener('click', closeEditModal);
             importFileBtn.addEventListener('click', () => fileInput.click());
+            importPdfBtn.addEventListener('click', () => pdfInput.click());
             exportFileBtn.addEventListener('click', exportFile);
             editContentBtn.addEventListener('click', openEditModal);
             shuffleBtn.addEventListener('click', shuffleItems);
@@ -642,6 +612,7 @@
             increaseFontBtn.addEventListener('click', increaseFontSize);
             decreaseFontBtn.addEventListener('click', decreaseFontSize);
             fileInput.addEventListener('change', handleFileImport);
+            pdfInput.addEventListener('change', handlePdfImport);
             
             searchInput.addEventListener('input', function() {
                 const hasText = this.value.trim().length > 0;
@@ -977,6 +948,7 @@
                 totalCardsSpan.textContent = `/ ${items.length}`;
                 
                 adjustInputWidth();
+                
                 cardContent.scrollTop = 0;
                 
                 if (searchTerm) {
@@ -1075,27 +1047,25 @@
                 const file = e.target.files[0];
                 if (!file) return;
                 
-                const fileExtension = file.name.split('.').pop().toLowerCase();
-                showLoading(`A processar ${file.name}...`);
-                
-                if (fileExtension === 'txt') {
-                    processTxtFile(file);
-                } else if (fileExtension === 'pdf') {
-                    processPdfFile(file);
-                } else {
-                    hideLoading();
-                    alert('Formato de arquivo não suportado!');
-                }
-                
-                // Resetar o input de arquivo para permitir a seleção do mesmo arquivo novamente
-                fileInput.value = '';
-            }
-
-            function processTxtFile(file) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     try {
-                        const contentString = e.target.result;
+                        const data = new Uint8Array(e.target.result);
+                        let contentString;
+                        
+                        try {
+                            const decoder = new TextDecoder('utf-8', {fatal: true});
+                            contentString = decoder.decode(data);
+                        } catch (err) {
+                            try {
+                                const decoder = new TextDecoder('iso-8859-1', {fatal: true});
+                                contentString = decoder.decode(data);
+                            } catch (err) {
+                                const decoder = new TextDecoder('utf-8', {fatal: false});
+                                contentString = decoder.decode(data);
+                            }
+                        }
+                        
                         const hasTabs = contentString.includes('\t');
                         const hasDoubleSemicolon = contentString.includes(';;');
                         const isAlternatingLines = checkAlternatingLinesFormat(contentString);
@@ -1110,78 +1080,71 @@
                         
                         updateDisplay();
                         toggleMenu();
-                        hideLoading();
                     } catch (error) {
-                        hideLoading();
-                        alert('Erro ao processar o arquivo TXT: ' + error.message);
+                        alert('Erro ao ler o arquivo: ' + error.message);
                     }
                 };
-                reader.onerror = function() {
-                    hideLoading();
-                    alert('Erro ao ler o arquivo TXT');
-                };
-                reader.readAsText(file, 'UTF-8');
+                
+                reader.readAsArrayBuffer(file);
             }
 
-            function processPdfFile(file) {
-                const fileReader = new FileReader();
-                fileReader.onload = function() {
-                    try {
-                        const typedarray = new Uint8Array(this.result);
+            function handlePdfImport(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const typedarray = new Uint8Array(e.target.result);
+                    
+                    // Carrega o PDF
+                    pdfjsLib.getDocument(typedarray).promise.then(function(pdf) {
+                        let pdfText = '';
+                        const totalPages = pdf.numPages;
+                        const pagePromises = [];
                         
-                        // Configurar o worker do PDF.js
-                        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-                        
-                        pdfjsLib.getDocument(typedarray).promise.then(function(pdf) {
-                            let totalPages = pdf.numPages;
-                            let textContent = '';
-                            
-                            const extractText = function(pageNum) {
-                                return pdf.getPage(pageNum).then(function(page) {
-                                    return page.getTextContent().then(function(textContentObj) {
-                                        return textContentObj.items.map(item => item.str).join(' ');
+                        // Processa cada página do PDF
+                        for (let i = 1; i <= totalPages; i++) {
+                            pagePromises.push(
+                                pdf.getPage(i).then(function(page) {
+                                    return page.getTextContent().then(function(textContent) {
+                                        let pageText = '';
+                                        for (const item of textContent.items) {
+                                            pageText += item.str + ' ';
+                                        }
+                                        return pageText;
                                     });
-                                });
-                            };
+                                })
+                            );
+                        }
+                        
+                        // Combina o texto de todas as páginas
+                        Promise.all(pagePromises).then(function(pagesText) {
+                            pdfText = pagesText.join('\n');
                             
-                            let pagePromises = [];
-                            for (let i = 1; i <= totalPages; i++) {
-                                pagePromises.push(extractText(i));
+                            // Processa o texto extraído
+                            const hasTabs = pdfText.includes('\t');
+                            const hasDoubleSemicolon = pdfText.includes(';;');
+                            const isAlternatingLines = checkAlternatingLinesFormat(pdfText);
+                            
+                            if (hasTabs || hasDoubleSemicolon) {
+                                parseQAContent(pdfText);
+                            } else if (isAlternatingLines) {
+                                parseAlternatingLinesContent(pdfText);
+                            } else {
+                                parseTextContent(pdfText);
                             }
                             
-                            Promise.all(pagePromises).then(function(pagesText) {
-                                textContent = pagesText.join('\n');
-                                parseTextContent(textContent);
-                                updateDisplay();
-                                toggleMenu();
-                                hideLoading();
-                            });
-                        }).catch(function(error) {
-                            hideLoading();
-                            alert('Erro ao processar PDF: ' + error.message);
+                            updateDisplay();
+                            toggleMenu();
                         });
-                    } catch (error) {
-                        hideLoading();
-                        alert('Erro ao processar PDF: ' + error.message);
-                    }
+                    }).catch(function(error) {
+                        alert('Erro ao processar o PDF: ' + error.message);
+                    });
                 };
-                fileReader.onerror = function() {
-                    hideLoading();
-                    alert('Erro ao ler o arquivo PDF');
-                };
-                fileReader.readAsArrayBuffer(file);
+                
+                reader.readAsArrayBuffer(file);
             }
-
-            function showLoading(message) {
-                loadingText.textContent = message || 'A processar...';
-                loadingOverlay.style.display = 'flex';
-            }
-
-            function hideLoading() {
-                loadingOverlay.style.display = 'none';
-            }
-
-            function exportFile() {
+                        function exportFile() {
                 if (items.length === 0) return;
                 
                 let content;
@@ -1297,6 +1260,7 @@
                         return `<span class="highlight">${match}</span>`;
                     });
                     
+                    // Se for o resultado atual, destacamos com uma classe diferente
                     if (isCurrent) {
                         newText = newText.replace(
                             new RegExp(searchTerm, 'i'), 
@@ -1316,16 +1280,6 @@
             }
             
             function clearSearch() {
-                searchTerm = '';
-                searchResults = [];
-                currentSearchIndex = -1;
-                searchInfo.textContent = '';
-                searchPrevBtn.disabled = true;
-                searchNextBtn.disabled = true;
-                isFirstSearchClick = true;
-                updateDisplay();
-            }
-                        function clearSearch() {
                 searchTerm = '';
                 searchResults = [];
                 currentSearchIndex = -1;
