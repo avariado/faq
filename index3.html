@@ -561,6 +561,7 @@
     <!-- Bibliotecas para processamento de PDF e EPUB -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <script>
         function adjustViewport() {
@@ -1088,6 +1089,9 @@
                     hideLoading();
                     alert('Formato de arquivo não suportado!');
                 }
+                
+                // Resetar o input de arquivo para permitir a seleção do mesmo arquivo novamente
+                fileInput.value = '';
             }
 
             function processTxtFile(file) {
@@ -1114,6 +1118,10 @@
                         hideLoading();
                         alert('Erro ao processar o arquivo TXT: ' + error.message);
                     }
+                };
+                reader.onerror = function() {
+                    hideLoading();
+                    alert('Erro ao ler o arquivo TXT');
                 };
                 reader.readAsText(file, 'UTF-8');
             }
@@ -1160,42 +1168,65 @@
                         alert('Erro ao processar PDF: ' + error.message);
                     }
                 };
+                fileReader.onerror = function() {
+                    hideLoading();
+                    alert('Erro ao ler o arquivo PDF');
+                };
                 fileReader.readAsArrayBuffer(file);
             }
 
             function processEpubFile(file) {
-                try {
-                    const url = URL.createObjectURL(file);
-                    const book = new ePub(url);
-                    
-                    book.ready.then(function() {
-                        return book.spine.spineItems;
-                    }).then(function(spineItems) {
-                        let textPromises = spineItems.map(function(item) {
-                            return book.load(item.idref).then(function(section) {
-                                const parser = new DOMParser();
-                                const doc = parser.parseFromString(section.content, 'text/html');
-                                return doc.body.textContent || "";
-                            });
-                        });
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        // Criar um objeto URL para o arquivo EPUB
+                        const epubUrl = URL.createObjectURL(new Blob([e.target.result], { type: 'application/epub+zip' }));
                         
-                        return Promise.all(textPromises);
-                    }).then(function(texts) {
-                        const textContent = texts.join('\n');
-                        parseTextContent(textContent);
-                        updateDisplay();
-                        toggleMenu();
-                        hideLoading();
-                        URL.revokeObjectURL(url);
-                    }).catch(function(error) {
+                        // Inicializar o livro EPUB
+                        const book = ePub(epubUrl);
+                        
+                        book.ready.then(() => {
+                            // Obter todos os itens da espinha (conteúdo principal)
+                            return book.spine.spineItems;
+                        }).then(spineItems => {
+                            // Extrair texto de cada item
+                            const extractionPromises = spineItems.map(item => {
+                                return book.load(item.idref).then(section => {
+                                    // Criar um elemento div temporário para extrair texto
+                                    const tempDiv = document.createElement('div');
+                                    tempDiv.innerHTML = section.content;
+                                    return tempDiv.textContent || tempDiv.innerText || "";
+                                });
+                            });
+                            
+                            return Promise.all(extractionPromises);
+                        }).then(texts => {
+                            // Juntar todo o texto extraído
+                            const fullText = texts.join('\n');
+                            
+                            // Processar o texto
+                            parseTextContent(fullText);
+                            updateDisplay();
+                            toggleMenu();
+                            hideLoading();
+                            
+                            // Liberar o objeto URL
+                            URL.revokeObjectURL(epubUrl);
+                        }).catch(error => {
+                            hideLoading();
+                            alert('Erro ao processar EPUB: ' + error.message);
+                            URL.revokeObjectURL(epubUrl);
+                        });
+                    } catch (error) {
                         hideLoading();
                         alert('Erro ao processar EPUB: ' + error.message);
-                        URL.revokeObjectURL(url);
-                    });
-                } catch (error) {
+                    }
+                };
+                reader.onerror = function() {
                     hideLoading();
-                    alert('Erro ao processar EPUB: ' + error.message);
-                }
+                    alert('Erro ao ler o arquivo EPUB');
+                };
+                reader.readAsArrayBuffer(file);
             }
 
             function showLoading(message) {
