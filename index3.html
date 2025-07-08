@@ -701,201 +701,7 @@
             // Teclado
             document.addEventListener('keydown', handleKeyDown);
         }
-                // Funções principais
-        function updateDisplay() {
-            if (items.length === 0) {
-                questionEl.textContent = 'Nenhum item para mostrar';
-                answerEl.textContent = '';
-                answerEl.classList.remove('visible');
-                return;
-            }
-
-            const currentItem = items[currentIndex];
-            
-            if (isQAMode) {
-                questionEl.textContent = currentItem.question || '';
-                answerEl.textContent = currentItem.answer || '';
-            } else {
-                questionEl.textContent = currentItem.text || '';
-                answerEl.textContent = '';
-            }
-            
-            highlightText();
-            updateCounter();
-            saveState();
-        }
-
-        function updateCounter() {
-            currentCardInput.value = currentIndex + 1;
-            totalCardsEl.textContent = `/ ${items.length}`;
-        }
-
-        function goToPrevCard() {
-            if (items.length === 0) return;
-            currentIndex = (currentIndex - 1 + items.length) % items.length;
-            updateDisplay();
-        }
-
-        function goToNextCard() {
-            if (items.length === 0) return;
-            currentIndex = (currentIndex + 1) % items.length;
-            updateDisplay();
-        }
-
-        function goToCard() {
-            const newIndex = parseInt(currentCardInput.value) - 1;
-            if (!isNaN(newIndex) {
-                currentIndex = Math.max(0, Math.min(newIndex, items.length - 1));
-                updateDisplay();
-            }
-        }
-
-        function toggleAnswer() {
-            if (isQAMode && items.length > 0) {
-                answerEl.classList.toggle('visible');
-            }
-        }
-
-        function toggleMenu() {
-            menu.classList.toggle('active');
-            overlay.classList.toggle('active');
-        }
-
-        function closeMenu() {
-            menu.classList.remove('active');
-            overlay.classList.remove('active');
-        }
-
-        function toggleModeHandler() {
-            isQAMode = !isQAMode;
-            closeMenu();
-            updateDisplay();
-        }
-
-        function editCurrentCard() {
-            if (items.length === 0) return;
-            
-            const currentItem = items[currentIndex];
-            if (isQAMode) {
-                editTextarea.value = `${currentItem.question}\n---\n${currentItem.answer}`;
-            } else {
-                editTextarea.value = currentItem.text;
-            }
-            
-            editModal.classList.add('active');
-            overlay.classList.add('active');
-            closeMenu();
-        }
-
-        function closeEditModal() {
-            editModal.classList.remove('active');
-            overlay.classList.remove('active');
-        }
-
-        function saveEditHandler() {
-            if (items.length === 0) return;
-            
-            const text = editTextarea.value;
-            if (isQAMode) {
-                const parts = text.split('\n---\n');
-                items[currentIndex] = {
-                    question: parts[0] || '',
-                    answer: parts[1] || ''
-                };
-            } else {
-                items[currentIndex] = {
-                    text: text
-                };
-            }
-            
-            closeEditModal();
-            updateDisplay();
-        }
-
-        function clearAll() {
-            if (confirm('Tem certeza que deseja limpar todos os itens?')) {
-                items = [];
-                originalItems = [];
-                currentIndex = 0;
-                closeMenu();
-                updateDisplay();
-                saveState();
-            }
-        }
-
-        function changeFontSize(change) {
-            baseFontSize = Math.max(12, Math.min(40, baseFontSize + change));
-            currentFontSize.textContent = baseFontSize;
-            updateFontSize();
-            saveState();
-        }
-
-        function updateFontSize() {
-            questionEl.style.fontSize = `${baseFontSize}px`;
-            answerEl.style.fontSize = `${baseFontSize - 2}px`;
-        }
-
-        function handleKeyDown(e) {
-            if (e.key === 'ArrowLeft') {
-                goToPrevCard();
-            } else if (e.key === 'ArrowRight') {
-                goToNextCard();
-            } else if (e.key === ' ' || e.key === 'Spacebar') {
-                toggleAnswer();
-                e.preventDefault();
-            }
-        }
-
-        // Funções de importação/exportação
-        async function handleFileImport(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            showProgressModal('Processando arquivo...');
-
-            try {
-                if (file.name.endsWith('.txt')) {
-                    await importTxtFile(file);
-                } else if (file.name.endsWith('.pdf')) {
-                    await importPdfFile(file);
-                } else if (file.name.endsWith('.epub')) {
-                    await importEpubFile(file);
-                } else {
-                    alert('Formato de arquivo não suportado. Use .txt, .pdf ou .epub');
-                }
-            } catch (error) {
-                console.error('Erro ao importar arquivo:', error);
-                alert('Erro ao processar arquivo: ' + error.message);
-            } finally {
-                hideProgressModal();
-                fileInput.value = ''; // Reset para permitir reimportação do mesmo arquivo
-            }
-        }
-
-        async function importTxtFile(file) {
-            const text = await file.text();
-            const lines = text.split('\n').filter(line => line.trim() !== '');
-            
-            if (isQAMode) {
-                items = [];
-                for (let i = 0; i < lines.length; i += 2) {
-                    const question = lines[i].trim();
-                    const answer = lines[i + 1] ? lines[i + 1].trim() : '';
-                    if (question) {
-                        items.push({ question, answer });
-                    }
-                }
-            } else {
-                items = lines.map(line => ({ text: line.trim() }));
-            }
-            
-            originalItems = [...items];
-            currentIndex = 0;
-            updateDisplay();
-            saveState();
-        }
-
-        async function importPdfFile(file) {
+                async function importPdfFile(file) {
             const arrayBuffer = await file.arrayBuffer();
             const loadingTask = pdfjsLib.getDocument(arrayBuffer);
             const pdf = await loadingTask.promise;
@@ -907,15 +713,28 @@
                 updateProgress(Math.round((i / totalPages) * 100));
                 const page = await pdf.getPage(i);
                 const textContent = await page.getTextContent();
-                const text = textContent.items.map(item => item.str).join(' ');
                 
-                if (text.trim()) {
+                // Método corrigido para extrair texto mantendo a formatação
+                let text = '';
+                let lastY = -1;
+                
+                for (const item of textContent.items) {
+                    // Agrupar por linhas (baseado na posição Y)
+                    if (Math.abs(item.transform[5] - lastY) > 5) {
+                        text += '\n';
+                        lastY = item.transform[5];
+                    }
+                    text += item.str + ' ';
+                }
+                
+                text = text.replace(/\s+/g, ' ').trim(); // Limpar espaços extras
+                
+                if (text) {
                     if (isQAMode) {
-                        // Tenta dividir em perguntas e respostas baseado em padrões comuns
                         const qaPairs = extractQAPairsFromText(text);
                         items.push(...qaPairs);
                     } else {
-                        items.push({ text: cleanText(text) });
+                        items.push({ text: text });
                     }
                 }
             }
@@ -928,30 +747,49 @@
 
         async function importEpubFile(file) {
             const arrayBuffer = await file.arrayBuffer();
-            const book = new Epub(arrayBuffer);
+            
+            // Converter ArrayBuffer para Uint8Array que o EPUB.js espera
+            const uint8Array = new Uint8Array(arrayBuffer);
+            const book = new Epub(uint8Array);
             
             items = [];
-            let totalLocations = 0;
-            let processedLocations = 0;
             
             await book.ready;
-            totalLocations = book.locations.total;
             
+            // Processar cada capítulo
             for (const spineItem of book.spine.contents) {
-                const text = await spineItem.load(book.load.bind(book));
-                const clean = cleanText(text);
-                
-                if (clean.trim()) {
-                    if (isQAMode) {
-                        const qaPairs = extractQAPairsFromText(clean);
-                        items.push(...qaPairs);
+                try {
+                    const text = await spineItem.load(book.load.bind(book));
+                    
+                    // Extrair texto do HTML (se aplicável)
+                    let cleanText = '';
+                    if (typeof text === 'string') {
+                        // Remover tags HTML e extrair texto
+                        const div = document.createElement('div');
+                        div.innerHTML = text;
+                        cleanText = div.textContent || div.innerText || '';
                     } else {
-                        items.push({ text: clean });
+                        // Já é texto puro
+                        cleanText = text;
                     }
+                    
+                    // Limpar e normalizar o texto
+                    cleanText = cleanText
+                        .replace(/[^\x00-\x7F]/g, '') // Remover caracteres não-ASCII
+                        .replace(/\s+/g, ' ') // Espaços múltiplos para único
+                        .trim();
+                    
+                    if (cleanText) {
+                        if (isQAMode) {
+                            const qaPairs = extractQAPairsFromText(cleanText);
+                            items.push(...qaPairs);
+                        } else {
+                            items.push({ text: cleanText });
+                        }
+                    }
+                } catch (error) {
+                    console.error('Erro ao processar capítulo EPUB:', error);
                 }
-                
-                processedLocations += spineItem.locations.length;
-                updateProgress(Math.round((processedLocations / totalLocations) * 100));
             }
             
             originalItems = [...items];
@@ -962,33 +800,26 @@
 
         function extractQAPairsFromText(text) {
             const qaPairs = [];
-            // Padrões comuns para identificar perguntas e respostas
-            const patterns = [
-                /(Q:|P:|Pergunta:|Question:)\s*(.*?)\s*(A:|R:|Resposta:|Answer:)\s*(.*?)(?=\nQ:|P:|Pergunta:|Question:|$)/gis,
-                /(.*?\?)\s*(.*?)(?=\n.*?\?|$)/gis
-            ];
+            const lines = text.split('\n').filter(line => line.trim() !== '');
             
-            for (const pattern of patterns) {
-                let match;
-                while ((match = pattern.exec(text)) !== null) {
-                    if (match[1] && match[2] && match[3] && match[4]) {
-                        // Padrão Q: ... A: ...
-                        qaPairs.push({ question: cleanText(match[2]), answer: cleanText(match[4]) });
-                    } else if (match[1] && match[2]) {
-                        // Padrão ...? ...
-                        qaPairs.push({ question: cleanText(match[1]), answer: cleanText(match[2]) });
-                    }
+            // Padrão para perguntas terminadas com ?
+            const questionPattern = /^.+\?$/;
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (questionPattern.test(line)) {
+                    const question = line;
+                    const answer = i + 1 < lines.length ? lines[i + 1].trim() : '';
+                    qaPairs.push({ question, answer });
+                    i++; // Pular a próxima linha (resposta)
                 }
-                
-                if (qaPairs.length > 0) break; // Se encontrou com um padrão, não tenta os outros
             }
             
-            // Se não encontrou padrões, divide por linhas alternadas
-            if (qaPairs.length === 0) {
-                const lines = text.split('\n').filter(line => line.trim() !== '');
+            // Se não encontrou perguntas, usar linhas alternadas
+            if (qaPairs.length === 0 && lines.length > 1) {
                 for (let i = 0; i < lines.length; i += 2) {
                     const question = lines[i].trim();
-                    const answer = lines[i + 1] ? lines[i + 1].trim() : '';
+                    const answer = i + 1 < lines.length ? lines[i + 1].trim() : '';
                     if (question) {
                         qaPairs.push({ question, answer });
                     }
@@ -996,11 +827,6 @@
             }
             
             return qaPairs;
-        }
-
-        function cleanText(text) {
-            // Remove múltiplos espaços, quebras de linha extras, etc.
-            return text.replace(/\s+/g, ' ').trim();
         }
                 function showProgressModal(message) {
             progressModal.querySelector('h2').textContent = message;
