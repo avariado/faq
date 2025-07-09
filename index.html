@@ -1141,14 +1141,35 @@
                     content = items.map(item => item.text).join('\n');
                 }
                 
-                const blob = new Blob([content], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
+                // Criar um elemento de input de arquivo para simular a caixa de diálogo de salvamento
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.nwsaveas = 'perguntas_respostas.txt';
                 
-                fileExport.href = url;
-                fileExport.download = 'perguntas_respostas.txt';
-                fileExport.click();
+                fileInput.onchange = (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    
+                    const blob = new Blob([content], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    // Criar um link temporário para o download
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = file.name || 'perguntas_respostas.txt';
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // Limpar
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    }, 100);
+                };
                 
-                URL.revokeObjectURL(url);
+                // Disparar o clique no input de arquivo
+                fileInput.click();
+                
                 toggleMenu();
             }
             
