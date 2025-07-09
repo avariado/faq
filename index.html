@@ -1131,37 +1131,26 @@
                 }
             }
 
-    function exportFile() {
-        if (items.length === 0) return;
-        
-        let content;
-        if (isQAMode) {
-            content = items.map(item => `${item.question}\t${item.answer}`).join('\n');
-        } else {
-            content = items.map(item => item.text).join('\n');
-        }
-        
-        // Criar um Blob com o conteúdo
-        const blob = new Blob([content], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        
-        // Criar um link temporário para o download
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'perguntas_respostas.txt';
-        
-        // Disparar o download
-        document.body.appendChild(a);
-        a.click();
-        
-        // Limpar
-        setTimeout(() => {
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }, 100);
-        
-        toggleMenu();
-    }
+            function exportFile() {
+                if (items.length === 0) return;
+                
+                let content;
+                if (isQAMode) {
+                    content = items.map(item => `${item.question}\t${item.answer}`).join('\n');
+                } else {
+                    content = items.map(item => item.text).join('\n');
+                }
+                
+                const blob = new Blob([content], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                
+                fileExport.href = url;
+                fileExport.download = 'perguntas_respostas.txt';
+                fileExport.click();
+                
+                URL.revokeObjectURL(url);
+                toggleMenu();
+            }
             
             function saveState() {
                 const state = {
