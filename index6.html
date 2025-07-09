@@ -429,23 +429,18 @@
             display: none;
         }
 
-        .export-options {
-            margin-bottom: 20px;
+        .export-modal-content {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
         }
-        
-        .export-option {
-            margin-bottom: 15px;
-        }
-        
-        .export-option label {
-            display: block;
-            margin-bottom: 5px;
+
+        .export-modal-content label {
             font-weight: bold;
+            margin-bottom: -10px;
         }
-        
-        .export-option input,
-        .export-option select {
-            width: 100%;
+
+        .export-modal-content input {
             padding: 8px;
             border: 1px solid #ddd;
             border-radius: 5px;
@@ -553,23 +548,14 @@
     </div>
 
     <div id="export-modal" class="modal">
-        <h2>Exportar Conteúdo</h2>
-        <div class="export-options">
-            <div class="export-option">
-                <label for="export-filename">Nome do arquivo:</label>
-                <input type="text" id="export-filename" value="perguntas_respostas.txt">
+        <h2>Exportar Ficheiro</h2>
+        <div class="export-modal-content">
+            <label for="export-filename">Nome do ficheiro:</label>
+            <input type="text" id="export-filename" value="perguntas_respostas.txt">
+            <div class="modal-buttons">
+                <button id="cancel-export" class="btn btn-secondary">Cancelar</button>
+                <button id="confirm-export" class="btn btn-primary">Exportar</button>
             </div>
-            <div class="export-option">
-                <label for="export-format">Formato:</label>
-                <select id="export-format">
-                    <option value="txt">Texto (.txt)</option>
-                    <option value="csv">CSV (.csv)</option>
-                </select>
-            </div>
-        </div>
-        <div class="modal-buttons">
-            <button id="cancel-export" class="btn btn-secondary">Cancelar</button>
-            <button id="confirm-export" class="btn btn-primary">Exportar</button>
         </div>
     </div>
 
@@ -634,7 +620,6 @@
             const processingMessage = document.getElementById('processing-message');
             const exportModal = document.getElementById('export-modal');
             const exportFilenameInput = document.getElementById('export-filename');
-            const exportFormatSelect = document.getElementById('export-format');
             const cancelExportBtn = document.getElementById('cancel-export');
             const confirmExportBtn = document.getElementById('confirm-export');
 
@@ -666,6 +651,8 @@
             increaseFontBtn.addEventListener('click', increaseFontSize);
             decreaseFontBtn.addEventListener('click', decreaseFontSize);
             fileInput.addEventListener('change', handleFileImport);
+            cancelExportBtn.addEventListener('click', closeExportModal);
+            confirmExportBtn.addEventListener('click', exportFile);
             
             searchInput.addEventListener('input', function() {
                 const hasText = this.value.trim().length > 0;
@@ -810,9 +797,6 @@
                 }
             });
 
-            cancelExportBtn.addEventListener('click', closeExportModal);
-            confirmExportBtn.addEventListener('click', performExport);
-
             function toggleMenu() {
                 menu.classList.toggle('active');
                 overlay.classList.toggle('active');
@@ -833,18 +817,10 @@
             }
 
             function openExportModal() {
-                if (items.length === 0) return;
-                
-                // Definir nome padrão com data/hora
-                const now = new Date();
-                const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-                const timeStr = now.getHours().toString().padStart(2, '0') + 
-                               now.getMinutes().toString().padStart(2, '0');
-                exportFilenameInput.value = `perguntas_respostas_${dateStr}_${timeStr}.txt`;
-                
+                toggleMenu();
+                exportFilenameInput.value = isQAMode ? 'perguntas_respostas.txt' : 'conteudo.txt';
                 exportModal.classList.add('active');
                 overlay.classList.add('active');
-                toggleMenu();
             }
 
             function closeExportModal() {
@@ -1203,35 +1179,70 @@
                 }
             }
 
-            function performExport() {
+            function exportFile() {
                 if (items.length === 0) return;
                 
                 let content;
-                const filename = exportFilenameInput.value.trim() || 'perguntas_respostas.txt';
-                const format = exportFormatSelect.value;
-                
                 if (isQAMode) {
-                    if (format === 'csv') {
-                        content = "Pergunta,Resposta\n";
-                        content += items.map(item => `"${item.question.replace(/"/g, '""')}","${item.answer.replace(/"/g, '""')}"`).join('\n');
-                    } else {
-                        content = items.map(item => `${item.question}\t${item.answer}`).join('\n');
-                    }
+                    content = items.map(item => `${item.question}\t${item.answer}`).join('\n');
                 } else {
                     content = items.map(item => item.text).join('\n');
                 }
                 
-                const extension = format === 'csv' ? '.csv' : '.txt';
-                const finalFilename = filename.endsWith(extension) ? filename : filename + extension;
-                const mimeType = format === 'csv' ? 'text/csv' : 'text/plain';
-                
-                const blob = new Blob([content], { type: mimeType });
+                const blob = new Blob([content], { type: 'text/plain' });
                 const url = URL.createObjectURL(blob);
                 
-                fileExport.href = url;
-                fileExport.download = finalFilename;
-                fileExport.click();
+                // Obter o nome do arquivo do input
+                let filename = exportFilenameInput.value.trim();
+                if (!filename) {
+                    filename = isQAMode ? 'perguntas_respostas.txt' : 'conteudo.txt';
+                }
                 
+                // Garantir que o arquivo tenha extensão .txt
+                if (!filename.toLowerCase().endsWith('.txt')) {
+                    filename += '.txt';
+                }
+                
+                // Usar a API File System Access se disponível (Chrome e Edge)
+                if ('showSaveFilePicker' in window) {
+                    try {
+                        const fileHandlePromise = window.showSaveFilePicker({
+                            suggestedName: filename,
+                            types: [{
+                                description: 'Arquivos de Texto',
+                                accept: {
+                                    'text/plain': ['.txt']
+                                }
+                            }]
+                        });
+                        
+                        fileHandlePromise.then(async (fileHandle) => {
+                            const writable = await fileHandle.createWritable();
+                            await writable.write(blob);
+                            await writable.close();
+                            closeExportModal();
+                        }).catch(err => {
+                            if (err.name !== 'AbortError') {
+                                console.error('Erro ao salvar arquivo:', err);
+                                // Fallback para o método tradicional
+                                fallbackExport(url, filename);
+                            }
+                        });
+                    } catch (err) {
+                        console.error('Erro ao usar File System Access API:', err);
+                        // Fallback para o método tradicional
+                        fallbackExport(url, filename);
+                    }
+                } else {
+                    // Fallback para navegadores que não suportam File System Access API
+                    fallbackExport(url, filename);
+                }
+            }
+            
+            function fallbackExport(url, filename) {
+                fileExport.href = url;
+                fileExport.download = filename;
+                fileExport.click();
                 URL.revokeObjectURL(url);
                 closeExportModal();
             }
