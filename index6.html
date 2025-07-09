@@ -429,6 +429,29 @@
             display: none;
         }
 
+        .export-options {
+            margin-bottom: 20px;
+        }
+        
+        .export-option {
+            margin-bottom: 15px;
+        }
+        
+        .export-option label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .export-option input,
+        .export-option select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
         @media (max-width: 600px) {
             #menu {
                 width: 80%;
@@ -529,6 +552,27 @@
         </div>
     </div>
 
+    <div id="export-modal" class="modal">
+        <h2>Exportar Conteúdo</h2>
+        <div class="export-options">
+            <div class="export-option">
+                <label for="export-filename">Nome do arquivo:</label>
+                <input type="text" id="export-filename" value="perguntas_respostas.txt">
+            </div>
+            <div class="export-option">
+                <label for="export-format">Formato:</label>
+                <select id="export-format">
+                    <option value="txt">Texto (.txt)</option>
+                    <option value="csv">CSV (.csv)</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-buttons">
+            <button id="cancel-export" class="btn btn-secondary">Cancelar</button>
+            <button id="confirm-export" class="btn btn-primary">Exportar</button>
+        </div>
+    </div>
+
     <input type="file" id="file-input" accept=".txt,.pdf">
     <a id="file-export" download="perguntas_respostas.txt"></a>
     
@@ -588,6 +632,11 @@
             const searchNextBtn = document.getElementById('search-next-btn');
             const searchInfo = document.getElementById('search-info');
             const processingMessage = document.getElementById('processing-message');
+            const exportModal = document.getElementById('export-modal');
+            const exportFilenameInput = document.getElementById('export-filename');
+            const exportFormatSelect = document.getElementById('export-format');
+            const cancelExportBtn = document.getElementById('cancel-export');
+            const confirmExportBtn = document.getElementById('confirm-export');
 
             let items = [];
             let originalItems = [];
@@ -610,7 +659,7 @@
             saveEditBtn.addEventListener('click', saveContent);
             cancelEditBtn.addEventListener('click', closeEditModal);
             importFileBtn.addEventListener('click', () => fileInput.click());
-            exportFileBtn.addEventListener('click', exportFile);
+            exportFileBtn.addEventListener('click', openExportModal);
             editContentBtn.addEventListener('click', openEditModal);
             shuffleBtn.addEventListener('click', shuffleItems);
             resetOrderBtn.addEventListener('click', resetOrder);
@@ -761,6 +810,9 @@
                 }
             });
 
+            cancelExportBtn.addEventListener('click', closeExportModal);
+            confirmExportBtn.addEventListener('click', performExport);
+
             function toggleMenu() {
                 menu.classList.toggle('active');
                 overlay.classList.toggle('active');
@@ -777,6 +829,26 @@
 
             function closeEditModal() {
                 editModal.classList.remove('active');
+                overlay.classList.remove('active');
+            }
+
+            function openExportModal() {
+                if (items.length === 0) return;
+                
+                // Definir nome padrão com data/hora
+                const now = new Date();
+                const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+                const timeStr = now.getHours().toString().padStart(2, '0') + 
+                               now.getMinutes().toString().padStart(2, '0');
+                exportFilenameInput.value = `perguntas_respostas_${dateStr}_${timeStr}.txt`;
+                
+                exportModal.classList.add('active');
+                overlay.classList.add('active');
+                toggleMenu();
+            }
+
+            function closeExportModal() {
+                exportModal.classList.remove('active');
                 overlay.classList.remove('active');
             }
 
@@ -1131,62 +1203,38 @@
                 }
             }
 
-function exportFile() {
-    if (items.length === 0) return;
-    
-    let content;
-    if (isQAMode) {
-        content = items.map(item => `${item.question}\t${item.answer}`).join('\n');
-    } else {
-        content = items.map(item => item.text).join('\n');
-    }
-    
-    // Tentar usar a API de File System Access moderna
-    if ('showSaveFilePicker' in window) {
-        try {
-            const handle = await window.showSaveFilePicker({
-                suggestedName: 'perguntas_respostas.txt',
-                types: [{
-                    description: 'Ficheiro de texto',
-                    accept: {
-                        'text/plain': ['.txt'],
-                    },
-                }],
-            });
-            
-            const writable = await handle.createWritable();
-            await writable.write(content);
-            await writable.close();
-            
-            toggleMenu();
-            return;
-        } catch (err) {
-            if (err.name !== 'AbortError') {
-                console.error('Erro ao salvar arquivo:', err);
-            } else {
-                // Usuário cancelou a operação
-                return;
+            function performExport() {
+                if (items.length === 0) return;
+                
+                let content;
+                const filename = exportFilenameInput.value.trim() || 'perguntas_respostas.txt';
+                const format = exportFormatSelect.value;
+                
+                if (isQAMode) {
+                    if (format === 'csv') {
+                        content = "Pergunta,Resposta\n";
+                        content += items.map(item => `"${item.question.replace(/"/g, '""')}","${item.answer.replace(/"/g, '""')}"`).join('\n');
+                    } else {
+                        content = items.map(item => `${item.question}\t${item.answer}`).join('\n');
+                    }
+                } else {
+                    content = items.map(item => item.text).join('\n');
+                }
+                
+                const extension = format === 'csv' ? '.csv' : '.txt';
+                const finalFilename = filename.endsWith(extension) ? filename : filename + extension;
+                const mimeType = format === 'csv' ? 'text/csv' : 'text/plain';
+                
+                const blob = new Blob([content], { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                
+                fileExport.href = url;
+                fileExport.download = finalFilename;
+                fileExport.click();
+                
+                URL.revokeObjectURL(url);
+                closeExportModal();
             }
-        }
-    }
-    
-    // Fallback para navegadores mais antigos
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'perguntas_respostas.txt';
-    document.body.appendChild(a);
-    a.click();
-    
-    setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }, 100);
-    
-    toggleMenu();
-}
             
             function saveState() {
                 const state = {
