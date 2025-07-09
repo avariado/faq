@@ -1131,47 +1131,62 @@
                 }
             }
 
-            function exportFile() {
-                if (items.length === 0) return;
-                
-                let content;
-                if (isQAMode) {
-                    content = items.map(item => `${item.question}\t${item.answer}`).join('\n');
-                } else {
-                    content = items.map(item => item.text).join('\n');
-                }
-                
-                // Criar um elemento de input de arquivo para simular a caixa de diálogo de salvamento
-                const fileInput = document.createElement('input');
-                fileInput.type = 'file';
-                fileInput.nwsaveas = 'perguntas_respostas.txt';
-                
-                fileInput.onchange = (e) => {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    
-                    const blob = new Blob([content], { type: 'text/plain' });
-                    const url = URL.createObjectURL(blob);
-                    
-                    // Criar um link temporário para o download
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = file.name || 'perguntas_respostas.txt';
-                    document.body.appendChild(a);
-                    a.click();
-                    
-                    // Limpar
-                    setTimeout(() => {
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
-                    }, 100);
-                };
-                
-                // Disparar o clique no input de arquivo
-                fileInput.click();
-                
-                toggleMenu();
+function exportFile() {
+    if (items.length === 0) return;
+    
+    let content;
+    if (isQAMode) {
+        content = items.map(item => `${item.question}\t${item.answer}`).join('\n');
+    } else {
+        content = items.map(item => item.text).join('\n');
+    }
+    
+    // Tentar usar a API de File System Access moderna
+    if ('showSaveFilePicker' in window) {
+        try {
+            const handle = await window.showSaveFilePicker({
+                suggestedName: 'perguntas_respostas.txt',
+                types: [{
+                    description: 'Ficheiro de texto',
+                    accept: {
+                        'text/plain': ['.txt'],
+                    },
+                }],
+            });
+            
+            const writable = await handle.createWritable();
+            await writable.write(content);
+            await writable.close();
+            
+            toggleMenu();
+            return;
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.error('Erro ao salvar arquivo:', err);
+            } else {
+                // Usuário cancelou a operação
+                return;
             }
+        }
+    }
+    
+    // Fallback para navegadores mais antigos
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'perguntas_respostas.txt';
+    document.body.appendChild(a);
+    a.click();
+    
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 100);
+    
+    toggleMenu();
+}
             
             function saveState() {
                 const state = {
