@@ -1125,9 +1125,19 @@
 
             function processTextFile(file) {
                 const reader = new FileReader();
+                
                 reader.onload = function(e) {
                     try {
-                        const contentString = e.target.result;
+                        // Primeira tentativa: UTF-8
+                        let contentString = e.target.result;
+                        
+                        // Verifica se há caracteres malformados (como �)
+                        if (contentString.includes('�')) {
+                            // Segunda tentativa: ISO-8859-1 (Latin-1)
+                            const decoder = new TextDecoder('ISO-8859-1');
+                            const data = new Uint8Array(e.target.result);
+                            contentString = decoder.decode(data);
+                        }
                         
                         const hasTabs = contentString.includes('\t');
                         const hasDoubleSemicolon = contentString.includes(';;');
@@ -1141,14 +1151,14 @@
                             parseTextContent(contentString);
                         }
                         
-                        updateDisplay(); // Atualiza a exibição imediatamente após a importação
+                        updateDisplay();
                     } catch (error) {
                         alert('Erro ao ler o arquivo: ' + error.message);
                     }
                 };
                 
-                // Usar readAsText para arquivos .txt
-                reader.readAsText(file);
+                // Lê como ArrayBuffer para podermos tentar diferentes codificações
+                reader.readAsArrayBuffer(file);
             }
 
             async function isFileActuallyPDF(file) {
