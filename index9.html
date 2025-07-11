@@ -564,10 +564,10 @@
     
     <div class="processing-message" id="processing-message">Processando PDF...</div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
     <script>
         // Configuração do PDF.js para evitar problemas com CORS
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
 
         function adjustViewport() {
             const vh = window.innerHeight * 0.01;
@@ -634,8 +634,6 @@
             let searchResults = [];
             let currentSearchIndex = -1;
             let isFirstSearchClick = true;
-
-            window.pdfjsLib = pdfjsLib;
 
             loadSampleData();
             updateDisplay();
@@ -1097,25 +1095,25 @@
                 adjustInputWidth();
             }
 
-function handleFileImport(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    // Fechar o menu imediatamente
-    toggleMenu();
-
-    // Verificação MIME Type mais robusta
-    if (file.type === 'application/pdf' || 
-        file.name.toLowerCase().endsWith('.pdf') || 
-        isFileActuallyPDF(file)) {
-        processPDFFile(file);
-    } else {
-        processTextFile(file);
-    }
-
-    // Limpar o input
-    e.target.value = '';
-}
+            function handleFileImport(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+            
+                // Fechar o menu imediatamente
+                toggleMenu();
+            
+                // Verificação MIME Type mais robusta
+                if (file.type === 'application/pdf' || 
+                    file.name.toLowerCase().endsWith('.pdf') || 
+                    isFileActuallyPDF(file)) {
+                    processPDFFile(file);
+                } else {
+                    processTextFile(file);
+                }
+            
+                // Limpar o input
+                e.target.value = '';
+            }
 
             function processTextFile(file) {
                 const reader = new FileReader();
@@ -1158,109 +1156,109 @@ function handleFileImport(e) {
                 reader.readAsArrayBuffer(file);
             }
 
- isFileActuallyPDF(file) {
-    // Verifica os primeiros bytes do arquivo para a assinatura PDF
-    return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const arr = new Uint8Array(e.target.result.slice(0, 4));
-            const header = Array.from(arr).map(b => b.toString(16)).join('');
-            resolve(header === '25504446'); // %PDF em hexadecimal
-        };
-        reader.readAsArrayBuffer(file.slice(0, 4));
-    });
-}
-
-async function processPDFFile(file) {
-    const processingMessage = document.getElementById('processing-message');
-    processingMessage.textContent = "Processando PDF...";
-    processingMessage.style.display = 'block';
-
-    try {
-        // 1. Verificação do cabeçalho do PDF
-        const isPDF = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const arr = new Uint8Array(e.target.result.slice(0, 4));
-                const header = Array.from(arr).map(b => b.toString(16)).join('');
-                resolve(header === '25504446'); // %PDF em hexadecimal
-            };
-            reader.readAsArrayBuffer(file.slice(0, 4));
-        });
-
-        if (!isPDF) {
-            throw new Error("O arquivo não é um PDF válido");
-        }
-
-        // 2. Carregamento do PDF com configurações otimizadas
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({
-            data: arrayBuffer,
-            cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
-            cMapPacked: true
-        }).promise;
-
-        // 3. Processamento seguro das páginas
-        let fullText = '';
-        
-        for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const textContent = await page.getTextContent();
-            
-            // Processamento seguro dos itens de texto
-            const pageText = textContent.items
-                .map(item => {
-                    // Verificação segura da propriedade transform
-                    const yPos = item.transform ? item.transform[5] : 0;
-                    return {
-                        text: item.str,
-                        yPos: yPos
+            async function isFileActuallyPDF(file) {
+                // Verifica os primeiros bytes do arquivo para a assinatura PDF
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const arr = new Uint8Array(e.target.result.slice(0, 4));
+                        const header = Array.from(arr).map(b => b.toString(16)).join('');
+                        resolve(header === '25504446'); // %PDF em hexadecimal
                     };
-                })
-                // Ordena por posição vertical (Y)
-                .sort((a, b) => b.yPos - a.yPos)
-                // Agrupa por linha
-                .reduce((acc, curr, index, array) => {
-                    if (index === 0 || Math.abs(curr.yPos - array[index-1].yPos) > 5) {
-                        acc.push([curr]);
-                    } else {
-                        acc[acc.length-1].push(curr);
+                    reader.readAsArrayBuffer(file.slice(0, 4));
+                });
+            }
+            
+            async function processPDFFile(file) {
+                const processingMessage = document.getElementById('processing-message');
+                processingMessage.textContent = "Processando PDF...";
+                processingMessage.style.display = 'block';
+            
+                try {
+                    // 1. Verificação do cabeçalho do PDF
+                    const isPDF = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            const arr = new Uint8Array(e.target.result.slice(0, 4));
+                            const header = Array.from(arr).map(b => b.toString(16)).join('');
+                            resolve(header === '25504446'); // %PDF em hexadecimal
+                        };
+                        reader.readAsArrayBuffer(file.slice(0, 4));
+                    });
+            
+                    if (!isPDF) {
+                        throw new Error("O arquivo não é um PDF válido");
                     }
-                    return acc;
-                }, [])
-                // Concatena o texto
-                .map(line => line.map(item => item.text).join(' '))
-                .join('\n');
-
-            fullText += pageText + '\n\n';
-        }
-
-        // 4. Detecção do formato (Q&A ou texto normal)
-        const lineCount = fullText.split('\n').length;
-        const questionCount = (fullText.match(/\?/g) || []).length;
-        
-        if (questionCount > 0 && questionCount/lineCount > 0.1) {
-            parseQAContent(fullText);
-        } else {
-            parseTextContent(fullText);
-        }
-
-    } catch (error) {
-        console.error("Erro no processamento:", error);
-        
-        // Fallback para processamento como texto simples
-        if (error.message.includes("Invalid PDF") || error.message.includes("cabeçalho")) {
-            processingMessage.textContent = "Tentando como arquivo de texto...";
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            processTextFile(file);
-        } else {
-            alert(`Erro: ${error.message}\nConsulte o console para detalhes.`);
-        }
-    } finally {
-        processingMessage.style.display = 'none';
-    }
-}
-         
+            
+                    // 2. Carregamento do PDF com configurações otimizadas
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument({
+                        data: arrayBuffer,
+                        cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+                        cMapPacked: true
+                    }).promise;
+            
+                    // 3. Processamento seguro das páginas
+                    let fullText = '';
+                    
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        
+                        // Processamento seguro dos itens de texto
+                        const pageText = textContent.items
+                            .map(item => {
+                                // Verificação segura da propriedade transform
+                                const yPos = item.transform ? item.transform[5] : 0;
+                                return {
+                                    text: item.str,
+                                    yPos: yPos
+                                };
+                            })
+                            // Ordena por posição vertical (Y)
+                            .sort((a, b) => b.yPos - a.yPos)
+                            // Agrupa por linha
+                            .reduce((acc, curr, index, array) => {
+                                if (index === 0 || Math.abs(curr.yPos - array[index-1].yPos) > 5) {
+                                    acc.push([curr]);
+                                } else {
+                                    acc[acc.length-1].push(curr);
+                                }
+                                return acc;
+                            }, [])
+                            // Concatena o texto
+                            .map(line => line.map(item => item.text).join(' '))
+                            .join('\n');
+            
+                        fullText += pageText + '\n\n';
+                    }
+            
+                    // 4. Detecção do formato (Q&A ou texto normal)
+                    const lineCount = fullText.split('\n').length;
+                    const questionCount = (fullText.match(/\?/g) || []).length;
+                    
+                    if (questionCount > 0 && questionCount/lineCount > 0.1) {
+                        parseQAContent(fullText);
+                    } else {
+                        parseTextContent(fullText);
+                    }
+            
+                } catch (error) {
+                    console.error("Erro no processamento:", error);
+                    
+                    // Fallback para processamento como texto simples
+                    if (error.message.includes("Invalid PDF") || error.message.includes("cabeçalho")) {
+                        processingMessage.textContent = "Tentando como arquivo de texto...";
+                        await new Promise(resolve => setTimeout(resolve, 1500));
+                        processTextFile(file);
+                    } else {
+                        alert(`Erro: ${error.message}\nConsulte o console para detalhes.`);
+                    }
+                } finally {
+                    processingMessage.style.display = 'none';
+                }
+            }
+            
             function exportFile() {
                 if (items.length === 0) return;
                 
