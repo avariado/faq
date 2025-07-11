@@ -1178,108 +1178,78 @@
                     }
             
                     // Se passar na verificação, processa como PDF
-                    processPDFFile(file);
+                    File(file);
                 };
                 
                 // Lê apenas os primeiros 4 bytes para verificação
                 reader.readAsArrayBuffer(file.slice(0, 4));
             }
             
-                        async function processPDFFile(file) {
-                processingMessage.textContent = "ANALISANDO ESTRUTURA DO PDF...";
-                processingMessage.style.display = 'block';
+   async function processPDFFile(file) {
+    processingMessage.textContent = "Processando PDF...";
+    processingMessage.style.display = 'block';
+
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        
+        // Configuração robusta para PDF.js
+        const loadingTask = pdfjsLib.getDocument({
+            data: arrayBuffer,
+            cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.11.338/cmaps/',
+            cMapPacked: true,
+            disableFontFace: true,
+            verbosity: 0
+        });
+
+        const pdf = await loadingTask.promise;
+        let fullText = '';
+
+        // Processa no máximo as 5 primeiras páginas para teste
+        for (let i = 1; i <= Math.min(pdf.numPages, 5); i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
             
-                try {
-                    const arrayBuffer = await file.arrayBuffer();
-                    
-                    // Verificação EXTRA do cabeçalho
-                    const header = new Uint8Array(arrayBuffer.slice(0, 8));
-                    if (!isValidPDFHeader(header)) {
-                        throw new Error("Estrutura de PDF inválida ou corrompida");
-                    }
+            // Extração segura de texto
+            const pageText = textContent.items
+                .map(item => item.str)
+                .join(' ')
+                .replace(/[^\w\s.,:;!?()-]/g, '') // Remove caracteres especiais
+                .trim();
             
-                    // Configuração EXTRA-RIGOROSA
-                    const loadingTask = pdfjsLib.getDocument({
-                        data: arrayBuffer,
-                        disableFontFace: true,
-                        disableAutoFetch: true,
-                        maxImageSize: 0, // Ignora imagens completamente
-                        isEvalSupported: false,
-                        disableRange: true
-                    });
-            
-                    const pdf = await loadingTask.promise;
-                    
-                    // Teste de CONTEÚDO REAL (3 camadas de verificação)
-                    const page = await pdf.getPage(1);
-                    const textContent = await page.getTextContent({
-                        disableCombineTextItems: true,
-                        includeMarkedContent: false
-                    });
-            
-                    // Verificação 1: Texto mínimo legível
-                    if (textContent.items.length < 5) {
-                        throw new Error("PDF não contém texto extraível suficiente");
-                    }
-            
-                    // Verificação 2: Proporção de caracteres válidos
-                    const sampleText = textContent.items.slice(0, 10).map(i => i.str).join('');
-                    if (/[^\w\s.,:;!?()\-–—'"@#$%&*+=/\\]/.test(sampleText)) {
-                        throw new Error("PDF contém caracteres não-textuais predominantes");
-                    }
-            
-                    // Verificação 3: Metadados vs. conteúdo real
-                    if (/%PDF|%EOF|obj|endobj|stream|endstream|xref|trailer|startxref/.test(sampleText)) {
-                        throw new Error("O script está lendo metadados em vez do conteúdo real");
-                    }
-            
-                    // Processamento ULTRA-CONSERVADOR
-                    let fullText = '';
-                    for (let i = 1; i <= Math.min(pdf.numPages, 5); i++) {
-                        const page = await pdf.getPage(i);
-                        const textContent = await page.getTextContent();
-                        fullText += textContent.items.map(item => {
-                            // Filtro AGGRESSIVO de caracteres
-                            return item.str.replace(/[^\w\s.,:;!?()\-–—'"@#$%&*+=/\\]/g, '');
-                        }).join(' ') + '\n\n';
-                    }
-            
-                    if (fullText.trim().length === 0) {
-                        throw new Error("Nenhum conteúdo textual válido encontrado");
-                    }
-            
-                    parseTextContent(fullText);
-                    updateDisplay();
-            
-                } catch (error) {
-                    console.error("FALHA CRÍTICA:", error);
-                    items = [{
-                        question: "ERRO: TIPO DE PDF NÃO SUPORTADO",
-                        answer: `Este PDF não pode ser processado pelo sistema.\n\n` +
-                               `Motivo técnico: ${error.message}\n\n` +
-                               `Solução: Converta o PDF para texto ou DOCX antes de importar.`
-                    }];
-                    updateDisplay();
-                } finally {
-                    processingMessage.style.display = 'none';
-                }
+            if (pageText) {
+                fullText += pageText + '\n\n';
             }
-            
-            // Função auxiliar para verificação EXTRA do cabeçalho
-            function isValidPDFHeader(header) {
-                // Versão 1: Verificação básica do cabeçalho
-                const basicCheck = header[0] === 0x25 && header[1] === 0x50 && 
-                                  header[2] === 0x44 && header[3] === 0x46;
-                
-                // Versão 2: Verificação para PDFs com versão
-                const versionCheck = /%PDF-\d\.\d/.test(String.fromCharCode(...header.slice(0, 8)));
-                
-                // Versão 3: Verificação para PDFs com objetos no início
-                const objectCheck = header.some((val, i) => val === 0x6F && header[i+1] === 0x62 && // "ob"
-                                                header[i+2] === 0x6A && header[i+3] === 0x65);     // "jec"
-                
-                return basicCheck || versionCheck || objectCheck;
-            }
+        }
+
+        // Verificação final do conteúdo
+        if (!fullText.trim()) {
+            throw new Error("O PDF não contém texto extraível");
+        }
+
+        // Atualiza a exibição corretamente
+        if (isQAMode) {
+            items = [{ question: "Conteúdo do PDF", answer: fullText }];
+        } else {
+            items = [{ text: fullText }];
+        }
+        
+        currentIndex = 0;
+        updateDisplay();
+
+    } catch (error) {
+        console.error("Erro ao processar PDF:", error);
+        items = [{
+            question: "ERRO: PDF não pode ser lido",
+            answer: `Motivo: ${error.message}\n\n` +
+                   `Este PDF pode ser uma imagem ou estar protegido.` +
+                   `Tente converter para texto primeiro.`
+        }];
+        currentIndex = 0;
+        updateDisplay();
+    } finally {
+        processingMessage.style.display = 'none';
+    }
+}
             
             function exportFile() {
                 if (items.length === 0) return;
