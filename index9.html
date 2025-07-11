@@ -1158,7 +1158,7 @@ function handleFileImport(e) {
                 reader.readAsArrayBuffer(file);
             }
 
-async function isFileActuallyPDF(file) {
+ isFileActuallyPDF(file) {
     // Verifica os primeiros bytes do arquivo para a assinatura PDF
     return new Promise((resolve) => {
         const reader = new FileReader();
@@ -1183,7 +1183,7 @@ async function processPDFFile(file) {
             reader.onload = (e) => {
                 const arr = new Uint8Array(e.target.result.slice(0, 4));
                 const header = Array.from(arr).map(b => b.toString(16)).join('');
-                resolve(header === '25504446'); // %PDF em hexadecimal
+                resolve(header === '25504446');
             };
             reader.readAsArrayBuffer(file.slice(0, 4));
         });
@@ -1192,7 +1192,7 @@ async function processPDFFile(file) {
             throw new Error("O arquivo não é um PDF válido");
         }
 
-        // 2. Carregamento do PDF com configurações otimizadas
+        // 2. Carregamento do PDF
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({
             data: arrayBuffer,
@@ -1200,67 +1200,53 @@ async function processPDFFile(file) {
             cMapPacked: true
         }).promise;
 
-        // 3. Processamento seguro das páginas
+        // 3. Processamento do texto
         let fullText = '';
-        
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
-            
-            // Processamento seguro dos itens de texto
-            const pageText = textContent.items
-                .map(item => {
-                    // Verificação segura da propriedade transform
-                    const yPos = item.transform ? item.transform[5] : 0;
-                    return {
-                        text: item.str,
-                        yPos: yPos
-                    };
-                })
-                // Ordena por posição vertical (Y)
-                .sort((a, b) => b.yPos - a.yPos)
-                // Agrupa por linha
-                .reduce((acc, curr, index, array) => {
-                    if (index === 0 || Math.abs(curr.yPos - array[index-1].yPos) > 5) {
-                        acc.push([curr]);
-                    } else {
-                        acc[acc.length-1].push(curr);
-                    }
-                    return acc;
-                }, [])
-                // Concatena o texto
-                .map(line => line.map(item => item.text).join(' '))
-                .join('\n');
-
+            const pageText = textContent.items.map(item => item.str).join(' ');
             fullText += pageText + '\n\n';
         }
 
-        // 4. Detecção do formato (Q&A ou texto normal)
-        const lineCount = fullText.split('\n').length;
-        const questionCount = (fullText.match(/\?/g) || []).length;
+        // 4. Processamento final
+        const hasQuestions = /(pergunta|question|resposta|answer|\?|:)/mi.test(fullText);
         
-        if (questionCount > 0 && questionCount/lineCount > 0.1) {
+        if (hasQuestions) {
             parseQAContent(fullText);
         } else {
             parseTextContent(fullText);
         }
 
+        // 5. Atualização da UI (NOVO - ESSA ERA A PEÇA QUE FALTAVA)
+        updateDisplay(); // Atualiza o texto na tela
+        toggleMenu(); // Fecha o menu automaticamente
+        currentIndex = 0; // Garante que mostra o primeiro item
+        scrollToTop(); // Rolagem para o topo
+
     } catch (error) {
-        console.error("Erro no processamento:", error);
+        console.error("Erro:", error);
         
-        // Fallback para processamento como texto simples
+        // Fallback para texto se o PDF estiver corrompido
         if (error.message.includes("Invalid PDF") || error.message.includes("cabeçalho")) {
-            processingMessage.textContent = "Tentando como arquivo de texto...";
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            processingMessage.textContent = "Processando como texto...";
+            await new Promise(resolve => setTimeout(resolve, 1000));
             processTextFile(file);
         } else {
-            alert(`Erro: ${error.message}\nConsulte o console para detalhes.`);
+            alert(`Erro: ${error.message}`);
         }
     } finally {
         processingMessage.style.display = 'none';
     }
 }
-            
+
+// Adicione esta função auxiliar (NOVO)
+function scrollToTop() {
+    const cardContent = document.getElementById('card-content');
+    if (cardContent) {
+        cardContent.scrollTop = 0;
+    }
+}            
             function exportFile() {
                 if (items.length === 0) return;
                 
