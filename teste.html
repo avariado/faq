@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Leitor de PDF com pdf.js</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  </script>
+</head>
+<body>
+  <h2>Seleciona um ficheiro PDF:</h2>
+  <input type="file" id="pdfInput" accept="application/pdf" />
+  <div id="processingMessage" style="display:none;">A processar...</div>
+  <pre id="output" style="white-space: pre-wrap;"></pre>
+
+  <script>
+    document.getElementById('pdfInput').addEventListener('change', async function (event) {
+      const file = event.target.files[0];
+      if (!file || file.type !== 'application/pdf') {
+        alert('Por favor, selecione um ficheiro PDF válido.');
+        return;
+      }
+      await processPDFFile(file);
+    });
+
+    async function processPDFFile(file) {
+      const processingMessage = document.getElementById('processingMessage');
+      const output = document.getElementById('output');
+      output.textContent = '';
+      processingMessage.style.display = 'block';
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+        let fullText = '';
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const textItems = textContent.items.map(item => item.str);
+          fullText += textItems.join(' ') + '\n\n';
+        }
+
+        output.textContent = fullText;
+
+      } catch (error) {
+        alert('Erro ao processar o PDF: ' + error.message);
+        console.error(error);
+      } finally {
+        processingMessage.style.display = 'none';
+      }
+    }
+  </script>
+</body>
+</html>
