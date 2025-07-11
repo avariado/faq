@@ -1153,64 +1153,76 @@
                 reader.readAsArrayBuffer(file);
             }
 
-async function processPDFFile(file) {
-    processingMessage.style.display = 'block';
-    processingMessage.textContent = 'Verificando arquivo...';
+async function handleFileImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
 
-    try {
-        // Verificação RADICAL do formato PDF
-        const arrayBuffer = await file.arrayBuffer();
-        const header = new Uint8Array(arrayBuffer.slice(0, 4));
-        const pdfHeader = [37, 80, 68, 70]; // %PDF em ASCII
+    // Verificação RADICAL do tipo de arquivo
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+        alert("ERRO: Isso não é um arquivo PDF válido!");
+        e.target.value = '';
+        return;
+    }
+
+    // Leitura dos primeiros bytes para verificar o cabeçalho REAL
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const arr = new Uint8Array(e.target.result);
         
-        if (!header.every((val, i) => val === pdfHeader[i])) {
-            throw new Error("Arquivo não é um PDF válido (cabeçalho ausente)");
+        // Verificação do cabeçalho do PDF (primeiros 4 bytes devem ser "%PDF")
+        if (arr[0] !== 0x25 || arr[1] !== 0x50 || arr[2] !== 0x44 || arr[3] !== 0x46) {
+            alert("ERRO GRAVE: Arquivo corrompido ou não é um PDF real!\n" +
+                  "Cabeçalho inválido: " + arr.slice(0, 4).join(' '));
+            e.target.value = '';
+            return;
         }
 
-        // Configuração À PROVA DE FALHAS
-        const loadingTask = pdfjsLib.getDocument({
-            data: arrayBuffer,
-            disableAutoFetch: true,
-            disableStream: true,
-            disableFontFace: true
-        });
+        // Se passar na verificação, processa como PDF
+        processPDFFile(file);
+    };
+    
+    // Lê apenas os primeiros 4 bytes para verificação
+    reader.readAsArrayBuffer(file.slice(0, 4));
+}
 
-        const pdf = await loadingTask.promise;
+async function processPDFFile(file) {
+    processingMessage.textContent = "VERIFICANDO PDF...";
+    processingMessage.style.display = 'block';
+
+    try {
+        // Carrega o arquivo COMPLETO após verificação
+        const arrayBuffer = await file.arrayBuffer();
         
-        // Teste de legibilidade RADICAL (apenas primeira página)
-        const testPage = await pdf.getPage(1);
-        const textContent = await testPage.getTextContent();
+        const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+        const page = await pdf.getPage(1);
+        const textContent = await page.getTextContent();
         
         if (textContent.items.length === 0) {
             throw new Error("PDF não contém texto legível (pode ser um scan)");
         }
 
-        // Processamento SIMPLES e DIRETO
-        let fullText = '';
-        for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) { // Limita a 10 páginas
-            const page = await pdf.getPage(i);
-            const textContent = await page.getTextContent();
-            fullText += textContent.items.map(item => item.str).join(' ') + '\n\n';
+        // Processamento SIMPLES do texto
+        let fullText = textContent.items.map(item => item.str).join(' ');
+        
+        if (fullText.includes('%PDF')) {
+            throw new Error("Tentativa de ler PDF como texto puro");
         }
 
-        // Fallback ULTRA-SIMPLES se o texto for ilegível
-        if (/[�]/.test(fullText) || fullText.trim().length < 10) {
-            throw new Error("Texto extraído contém caracteres inválidos");
-        }
-
-        parseTextContent(fullText); // Força modo texto puro
+        parseTextContent(fullText);
         updateDisplay();
 
     } catch (error) {
-        console.error("FALHA CATASTRÓFICA:", error);
-        alert(`PDF NÃO LEGÍVEL:\n${error.message}\n\nO arquivo pode ser:\n1. Um scan/imagem\n2. Protegido/criptografado\n3. Corrompido`);
-        items = [{ text: "ERRO: O PDF NÃO PÔDE SER LIDO - CONTÉM APENAS DADOS BINÁRIOS/IMAGENS" }];
+        console.error("FALHA NO PDF:", error);
+        items = [{
+            text: "ERRO: O ARQUIVO PDF NÃO PÔDE SER INTERPRETADO",
+            details: error.message
+        }];
         updateDisplay();
     } finally {
         processingMessage.style.display = 'none';
+        fileInput.value = ''; // Limpa o input
     }
-}
-            
+}            
             function exportFile() {
                 if (items.length === 0) return;
                 
