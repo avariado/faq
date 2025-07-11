@@ -1155,42 +1155,54 @@
                 reader.readAsArrayBuffer(file);
             }
 
-			async function processPDFFile(file) {
-                processingMessage.style.display = 'block';
-                
-                try {
-                    const arrayBuffer = await file.arrayBuffer();
-                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                    
-                    let fullText = '';
-                    
-                    for (let i = 1; i <= pdf.numPages; i++) {
-                        const page = await pdf.getPage(i);
-                        const textContent = await page.getTextContent();
-                        const textItems = textContent.items.map(item => item.str);
-                        fullText += textItems.join(' ') + '\n\n';
-                    }
-                    
-                    // Verifica se o texto parece ser no formato Q&A
-                    const hasQuestions = fullText.match(/(pergunta|question|^[0-9]+[.)]\s|^\s*\?)/mi);
-                    const hasAnswers = fullText.match(/(resposta|answer|^\s*:/mi);
-                    
-                    if (hasQuestions && hasAnswers) {
-                        // Tenta parsear como Q&A
-                        parseQAContent(fullText);
-                    } else {
-                        // Caso contrário, trata como texto contínuo
-                        parseTextContent(fullText);
-                    }
-                    
-                    updateDisplay();
-                } catch (error) {
-                    alert('Erro ao processar o PDF: ' + error.message);
-                    console.error(error);
-                } finally {
-                    processingMessage.style.display = 'none';
-                }
-            }
+async function processPDFFile(file) {
+    const processingMessage = document.getElementById('processing-message');
+    processingMessage.style.display = 'block';
+    
+    try {
+        // 1. Carrega o arquivo PDF
+        const arrayBuffer = await file.arrayBuffer();
+        
+        // 2. Configurações otimizadas para o PDF.js
+        const pdf = await pdfjsLib.getDocument({
+            data: arrayBuffer,
+            cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+            cMapPacked: true
+        }).promise;
+
+        let fullText = '';
+        
+        // 3. Processa cada página
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent({
+                normalizeWhitespace: true,
+                disableCombineTextItems: false
+            });
+            
+            // 4. Extrai e formata o texto corretamente
+            const pageText = textContent.items.map(item => item.str).join(' ');
+            fullText += pageText + '\n\n';
+        }
+
+        // 5. Processa o texto extraído
+        const hasQAFormat = /(pergunta|question|resposta|answer|:|\?)/mi.test(fullText);
+        
+        if (hasQAFormat) {
+            parseQAContent(fullText);
+        } else {
+            parseTextContent(fullText);
+        }
+        
+        updateDisplay();
+        
+    } catch (error) {
+        console.error("Erro detalhado:", error);
+        alert('Erro ao processar PDF: ' + error.message);
+    } finally {
+        processingMessage.style.display = 'none';
+    }
+}
             
             function exportFile() {
                 if (items.length === 0) return;
