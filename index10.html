@@ -1102,17 +1102,20 @@
                 // Fechar o menu imediatamente
                 toggleMenu();
             
-                // Verificação de tipo de arquivo mais abrangente
+                // Verificação mais robusta do tipo de arquivo
                 if (file.type === 'application/pdf' || 
-                    file.name.toLowerCase().endsWith('.pdf') || 
-                    isFileActuallyPDF(file)) {
-                    processPDFFile(file);
-                } else if (file.type === 'text/plain' || 
-                           file.name.toLowerCase().endsWith('.txt') || 
-                           file.type === '') { // Alguns navegadores podem não reportar o tipo para .txt
-                    processTextFile(file);
+                    file.name.toLowerCase().endsWith('.pdf')) {
+                    // Verificação adicional para garantir que é realmente um PDF
+                    isFileActuallyPDF(file).then(isPDF => {
+                        if (isPDF) {
+                            processPDFFile(file);
+                        } else {
+                            // Se não for PDF mas tem extensão .pdf, tenta como texto
+                            processTextFile(file);
+                        }
+                    });
                 } else {
-                    // Tentar processar como texto mesmo que não seja reconhecido como .txt
+                    // Qualquer outro arquivo tenta processar como texto
                     processTextFile(file);
                 }
             
