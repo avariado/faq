@@ -1209,7 +1209,48 @@ async function handleFileImport(e) {
         processingMessage.style.display = 'none';
         document.getElementById('file-input').value = '';
     }
-}            
+}   
+
+ async function processPDFFile(file) {
+    const processingMessage = document.getElementById('processingMessage');
+    processingMessage.style.display = 'block';
+
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+
+        // Verifica se é um ficheiro PDF pelo header
+        const uint8Array = new Uint8Array(arrayBuffer);
+        const header = new TextDecoder().decode(uint8Array.slice(0, 5));
+        if (!header.startsWith('%PDF-')) {
+            throw new Error('O ficheiro selecionado não parece ser um PDF válido.');
+        }
+
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        const pdf = await loadingTask.promise;
+
+        let fullText = '';
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            const textItems = textContent.items.map(item => item.str);
+            fullText += textItems.join(' ') + '\n';
+        }
+
+        if (fullText.trim() === '') {
+            alert('Este PDF não contém texto pesquisável. Pode ser uma imagem.');
+        }
+
+        parseTextContent(fullText);
+        updateDisplay();
+
+    } catch (error) {
+        alert('Erro ao processar o PDF: ' + error.message);
+        console.error(error);
+    } finally {
+        processingMessage.style.display = 'none';
+    }
+}           
             function exportFile() {
                 if (items.length === 0) return;
                 
