@@ -1095,45 +1095,47 @@
                 adjustInputWidth();
             }
 
- function handleFileImport(e) {
+function handleFileImport(e) {
     const file = e.target.files[0];
     if (!file) return;
-
+    
+    // Fechar o menu imediatamente
     toggleMenu();
-
+    
     if (file.name.endsWith('.pdf')) {
         processPDFFile(file);
     } else {
         processTextFile(file);
     }
 
+    // Limpar o input para permitir a seleção do mesmo arquivo novamente
     e.target.value = '';
 }
 
 function processTextFile(file) {
     const reader = new FileReader();
-    reader.onload = function (e) {
+    reader.onload = function(e) {
         try {
             const data = new Uint8Array(e.target.result);
             let contentString;
-
+            
             try {
-                const decoder = new TextDecoder('utf-8', { fatal: true });
+                const decoder = new TextDecoder('utf-8', {fatal: true});
                 contentString = decoder.decode(data);
             } catch (err) {
                 try {
-                    const decoder = new TextDecoder('iso-8859-1', { fatal: true });
+                    const decoder = new TextDecoder('iso-8859-1', {fatal: true});
                     contentString = decoder.decode(data);
                 } catch (err) {
-                    const decoder = new TextDecoder('utf-8', { fatal: false });
+                    const decoder = new TextDecoder('utf-8', {fatal: false});
                     contentString = decoder.decode(data);
                 }
             }
-
+            
             const hasTabs = contentString.includes('\t');
             const hasDoubleSemicolon = contentString.includes(';;');
             const isAlternatingLines = checkAlternatingLinesFormat(contentString);
-
+            
             if (hasTabs || hasDoubleSemicolon) {
                 parseQAContent(contentString);
             } else if (isAlternatingLines) {
@@ -1141,14 +1143,14 @@ function processTextFile(file) {
             } else {
                 parseTextContent(contentString);
             }
-
+            
             updateDisplay();
         } catch (error) {
             alert('Erro ao ler o arquivo: ' + error.message);
         }
     };
-
-    reader.readAsArrayBuffer(file); // ✅ continua correto para .txt
+    
+    reader.readAsArrayBuffer(file);
 }
 
 async function processPDFFile(file) {
@@ -1157,6 +1159,8 @@ async function processPDFFile(file) {
 
     try {
         const arrayBuffer = await file.arrayBuffer();
+
+        // Corrigido: uso correto da API do pdf.js
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
         let fullText = '';
@@ -1168,13 +1172,8 @@ async function processPDFFile(file) {
             fullText += textItems.join(' ') + '\n';
         }
 
-        if (fullText.trim() === '') {
-            alert('O PDF foi carregado, mas não contém texto pesquisável.');
-        }
-
         parseTextContent(fullText);
         updateDisplay();
-
     } catch (error) {
         alert('Erro ao processar o PDF: ' + error.message);
         console.error(error);
