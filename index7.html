@@ -1153,87 +1153,63 @@
                 reader.readAsArrayBuffer(file);
             }
 
-        async function processPDFFile(file) {
-            processingMessage.style.display = 'block';
-            
-            try {
-                const arrayBuffer = await file.arrayBuffer();
-                
-                // Configurações otimizadas para extração de texto
-                const loadingTask = pdfjsLib.getDocument({
-                    data: arrayBuffer,
-                    cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.11.338/cmaps/',
-                    cMapPacked: true,
-                    disableFontFace: false,
-                    verbosity: 0,
-                    enableXfa: false,
-                    isEvalSupported: false,
-                    useSystemFonts: true
-                });
-                
-                const pdf = await loadingTask.promise;
-                let fullText = '';
-                
-                // Processar cada página do PDF
-                for (let i = 1; i <= pdf.numPages; i++) {
-                    const page = await pdf.getPage(i);
-                    
-                    // Configurações otimizadas para extração de texto
-                    const textContent = await page.getTextContent({
-                        normalizeWhitespace: true,
-                        disableCombineTextItems: false,
-                        includeMarkedContent: false
-                    });
-                    
-                    // Extrair e limpar o texto
-                    const pageText = textContent.items
-                        .map(item => {
-                            // Limpar caracteres especiais e normalizar espaços
-                            let text = item.str
-                                .replace(/[\x00-\x1F\x7F-\x9F]/g, '')  // Remover caracteres não imprimíveis
-                                .replace(/\s+/g, ' ')                  // Normalizar espaços
-                                .trim();
-                            
-                            // Adicionar quebra de linha após títulos ou seções
-                            if (text.endsWith(':')) {
-                                text += '\n';
-                            }
-                            return text;
-                        })
-                        .join(' ');
-                    
-                    fullText += pageText + '\n\n';
-                }
-                
-                // Pós-processamento do texto extraído
-                fullText = fullText
-                    .replace(/(\n\s*){3,}/g, '\n\n')  // Remover múltiplas quebras de linha
-                    .replace(/\s*\.\s*/g, '. ')        // Normalizar pontos
-                    .replace(/\s*,\s*/g, ', ')         // Normalizar vírgulas
-                    .replace(/\s*:\s*/g, ': ')         // Normalizar dois pontos
-                    .trim();
-                
-                // Verificar se o texto parece ser estruturado como Q&A
-                const hasTabs = fullText.includes('\t');
-                const hasDoubleSemicolon = fullText.includes(';;');
-                const isAlternatingLines = checkAlternatingLinesFormat(fullText);
-                
-                if (hasTabs || hasDoubleSemicolon) {
-                    parseQAContent(fullText);
-                } else if (isAlternatingLines) {
-                    parseAlternatingLinesContent(fullText);
-                } else {
-                    parseTextContent(fullText);
-                }
-                
-                updateDisplay();
-            } catch (error) {
-                console.error('Erro detalhado ao processar PDF:', error);
-                alert('Erro ao processar o PDF. O arquivo pode estar protegido ou não conter texto legível. Detalhes: ' + error.message);
-            } finally {
-                processingMessage.style.display = 'none';
-            }
+async function processPDFFile(file) {
+    processingMessage.style.display = 'block';
+    processingMessage.textContent = 'Verificando arquivo...';
+
+    try {
+        // Verificação RADICAL do formato PDF
+        const arrayBuffer = await file.arrayBuffer();
+        const header = new Uint8Array(arrayBuffer.slice(0, 4));
+        const pdfHeader = [37, 80, 68, 70]; // %PDF em ASCII
+        
+        if (!header.every((val, i) => val === pdfHeader[i])) {
+            throw new Error("Arquivo não é um PDF válido (cabeçalho ausente)");
         }
+
+        // Configuração À PROVA DE FALHAS
+        const loadingTask = pdfjsLib.getDocument({
+            data: arrayBuffer,
+            disableAutoFetch: true,
+            disableStream: true,
+            disableFontFace: true
+        });
+
+        const pdf = await loadingTask.promise;
+        
+        // Teste de legibilidade RADICAL (apenas primeira página)
+        const testPage = await pdf.getPage(1);
+        const textContent = await testPage.getTextContent();
+        
+        if (textContent.items.length === 0) {
+            throw new Error("PDF não contém texto legível (pode ser um scan)");
+        }
+
+        // Processamento SIMPLES e DIRETO
+        let fullText = '';
+        for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) { // Limita a 10 páginas
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            fullText += textContent.items.map(item => item.str).join(' ') + '\n\n';
+        }
+
+        // Fallback ULTRA-SIMPLES se o texto for ilegível
+        if (/[�]/.test(fullText) || fullText.trim().length < 10) {
+            throw new Error("Texto extraído contém caracteres inválidos");
+        }
+
+        parseTextContent(fullText); // Força modo texto puro
+        updateDisplay();
+
+    } catch (error) {
+        console.error("FALHA CATASTRÓFICA:", error);
+        alert(`PDF NÃO LEGÍVEL:\n${error.message}\n\nO arquivo pode ser:\n1. Um scan/imagem\n2. Protegido/criptografado\n3. Corrompido`);
+        items = [{ text: "ERRO: O PDF NÃO PÔDE SER LIDO - CONTÉM APENAS DADOS BINÁRIOS/IMAGENS" }];
+        updateDisplay();
+    } finally {
+        processingMessage.style.display = 'none';
+    }
+}
             
             function exportFile() {
                 if (items.length === 0) return;
