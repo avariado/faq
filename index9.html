@@ -1095,149 +1095,147 @@
                 adjustInputWidth();
             }
 
-            function handleFileImport(e) {
-                const file = e.target.files[0];
-                if (!file) return;
-                
-                // Fechar o menu imediatamente
-                toggleMenu();
-                
-                if (file.name.endsWith('.pdf')) {
-                    processPDFFile(file);
-                } else {
-                    processTextFile(file);
-                }
-                
-                // Limpar o input para permitir a seleção do mesmo arquivo novamente
-                e.target.value = '';
-            }
+ function handleFileImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
 
-            function processTextFile(file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    try {
-                        const data = new Uint8Array(e.target.result);
-                        let contentString;
-                        
-                        try {
-                            const decoder = new TextDecoder('utf-8', {fatal: true});
-                            contentString = decoder.decode(data);
-                        } catch (err) {
-                            try {
-                                const decoder = new TextDecoder('iso-8859-1', {fatal: true});
-                                contentString = decoder.decode(data);
-                            } catch (err) {
-                                const decoder = new TextDecoder('utf-8', {fatal: false});
-                                contentString = decoder.decode(data);
-                            }
-                        }
-                        
-                        const hasTabs = contentString.includes('\t');
-                        const hasDoubleSemicolon = contentString.includes(';;');
-                        const isAlternatingLines = checkAlternatingLinesFormat(contentString);
-                        
-                        if (hasTabs || hasDoubleSemicolon) {
-                            parseQAContent(contentString);
-                        } else if (isAlternatingLines) {
-                            parseAlternatingLinesContent(contentString);
-                        } else {
-                            parseTextContent(contentString);
-                        }
-                        
-                        updateDisplay();
-                    } catch (error) {
-                        alert('Erro ao ler o arquivo: ' + error.message);
-                    }
-                };
-                
-                reader.readAsArrayBuffer(file);
-            }
+    toggleMenu();
 
-            async function processPDFFile(file) {
-                processingMessage.style.display = 'block';
-                
+    if (file.name.endsWith('.pdf')) {
+        processPDFFile(file);
+    } else {
+        processTextFile(file);
+    }
+
+    e.target.value = '';
+}
+
+function processTextFile(file) {
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            let contentString;
+
+            try {
+                const decoder = new TextDecoder('utf-8', { fatal: true });
+                contentString = decoder.decode(data);
+            } catch (err) {
                 try {
-                    const arrayBuffer = await file.arrayBuffer();
-                    const loadingTask = pdfjsLib.getDocument(arrayBuffer);
-                    const pdf = await loadingTask.promise;
-                    
-                    let fullText = '';
-                    
-                    for (let i = 1; i <= pdf.numPages; i++) {
-                        const page = await pdf.getPage(i);
-                        const textContent = await page.getTextContent();
-                        const textItems = textContent.items.map(item => item.str);
-                        fullText += textItems.join(' ') + '\n';
-                    }
-                    
-                    parseTextContent(fullText);
-                    updateDisplay();
-                } catch (error) {
-                    alert('Erro ao processar o PDF: ' + error.message);
-                } finally {
-                    processingMessage.style.display = 'none';
+                    const decoder = new TextDecoder('iso-8859-1', { fatal: true });
+                    contentString = decoder.decode(data);
+                } catch (err) {
+                    const decoder = new TextDecoder('utf-8', { fatal: false });
+                    contentString = decoder.decode(data);
                 }
             }
 
-            function exportFile() {
-                if (items.length === 0) return;
-                
-                let content;
-                if (isQAMode) {
-                    content = items.map(item => `${item.question}\t${item.answer}`).join('\n');
-                } else {
-                    content = items.map(item => item.text).join('\n');
-                }
-                
-                const blob = new Blob([content], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                
-                // Obter o nome do arquivo do input
-                let filename = exportFilenameInput.value.trim();
-                if (!filename) {
-                    filename = isQAMode ? 'perguntas_respostas.txt' : 'conteudo.txt';
-                }
-                
-                // Garantir que o arquivo tenha extensão .txt
-                if (!filename.toLowerCase().endsWith('.txt')) {
-                    filename += '.txt';
-                }
-                
-                // Usar a API File System Access se disponível (Chrome e Edge)
-                if ('showSaveFilePicker' in window) {
-                    try {
-                        const fileHandlePromise = window.showSaveFilePicker({
-                            suggestedName: filename,
-                            types: [{
-                                description: 'Arquivos de Texto',
-                                accept: {
-                                    'text/plain': ['.txt']
-                                }
-                            }]
-                        });
-                        
-                        fileHandlePromise.then(async (fileHandle) => {
-                            const writable = await fileHandle.createWritable();
-                            await writable.write(blob);
-                            await writable.close();
-                            closeExportModal();
-                        }).catch(err => {
-                            if (err.name !== 'AbortError') {
-                                console.error('Erro ao salvar arquivo:', err);
-                                // Fallback para o método tradicional
-                                fallbackExport(url, filename);
-                            }
-                        });
-                    } catch (err) {
-                        console.error('Erro ao usar File System Access API:', err);
-                        // Fallback para o método tradicional
-                        fallbackExport(url, filename);
+            const hasTabs = contentString.includes('\t');
+            const hasDoubleSemicolon = contentString.includes(';;');
+            const isAlternatingLines = checkAlternatingLinesFormat(contentString);
+
+            if (hasTabs || hasDoubleSemicolon) {
+                parseQAContent(contentString);
+            } else if (isAlternatingLines) {
+                parseAlternatingLinesContent(contentString);
+            } else {
+                parseTextContent(contentString);
+            }
+
+            updateDisplay();
+        } catch (error) {
+            alert('Erro ao ler o arquivo: ' + error.message);
+        }
+    };
+
+    reader.readAsArrayBuffer(file); // ✅ continua correto para .txt
+}
+
+async function processPDFFile(file) {
+    const processingMessage = document.getElementById('processingMessage');
+    processingMessage.style.display = 'block';
+
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+        let fullText = '';
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            const textItems = textContent.items.map(item => item.str);
+            fullText += textItems.join(' ') + '\n';
+        }
+
+        if (fullText.trim() === '') {
+            alert('O PDF foi carregado, mas não contém texto pesquisável.');
+        }
+
+        parseTextContent(fullText);
+        updateDisplay();
+
+    } catch (error) {
+        alert('Erro ao processar o PDF: ' + error.message);
+        console.error(error);
+    } finally {
+        processingMessage.style.display = 'none';
+    }
+}
+
+function exportFile() {
+    if (items.length === 0) return;
+
+    let content;
+    if (isQAMode) {
+        content = items.map(item => `${item.question}\t${item.answer}`).join('\n');
+    } else {
+        content = items.map(item => item.text).join('\n');
+    }
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+
+    let filename = exportFilenameInput.value.trim();
+    if (!filename) {
+        filename = isQAMode ? 'perguntas_respostas.txt' : 'conteudo.txt';
+    }
+
+    if (!filename.toLowerCase().endsWith('.txt')) {
+        filename += '.txt';
+    }
+
+    if ('showSaveFilePicker' in window) {
+        try {
+            const fileHandlePromise = window.showSaveFilePicker({
+                suggestedName: filename,
+                types: [{
+                    description: 'Arquivos de Texto',
+                    accept: {
+                        'text/plain': ['.txt']
                     }
-                } else {
-                    // Fallback para navegadores que não suportam File System Access API
+                }]
+            });
+
+            fileHandlePromise.then(async (fileHandle) => {
+                const writable = await fileHandle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+                closeExportModal();
+            }).catch(err => {
+                if (err.name !== 'AbortError') {
+                    console.error('Erro ao salvar arquivo:', err);
                     fallbackExport(url, filename);
                 }
-            }
+            });
+        } catch (err) {
+            console.error('Erro ao usar File System Access API:', err);
+            fallbackExport(url, filename);
+        }
+    } else {
+        fallbackExport(url, filename);
+    }
+}          
             
             function fallbackExport(url, filename) {
                 fileExport.href = url;
