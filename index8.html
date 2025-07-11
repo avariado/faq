@@ -1152,105 +1152,64 @@
                 
                 reader.readAsArrayBuffer(file);
             }
+            
+async function handleFileImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
 
-            async function handleFileImport(e) {
-                const file = e.target.files[0];
-                if (!file) return;
-            
-                // Verificação RADICAL do tipo de arquivo
-                if (!file.name.toLowerCase().endsWith('.pdf')) {
-                    alert("ERRO: Isso não é um arquivo PDF válido!");
-                    e.target.value = '';
-                    return;
-                }
-            
-                // Leitura dos primeiros bytes para verificar o cabeçalho REAL
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const arr = new Uint8Array(e.target.result);
-                    
-                    // Verificação do cabeçalho do PDF (primeiros 4 bytes devem ser "%PDF")
-                    if (arr[0] !== 0x25 || arr[1] !== 0x50 || arr[2] !== 0x44 || arr[3] !== 0x46) {
-                        alert("ERRO GRAVE: Arquivo corrompido ou não é um PDF real!\n" +
-                              "Cabeçalho inválido: " + arr.slice(0, 4).join(' '));
-                        e.target.value = '';
-                        return;
-                    }
-            
-                    // Se passar na verificação, processa como PDF
-                    File(file);
-                };
-                
-                // Lê apenas os primeiros 4 bytes para verificação
-                reader.readAsArrayBuffer(file.slice(0, 4));
-            }
-            
-   async function processPDFFile(file) {
-    processingMessage.textContent = "Processando PDF...";
+    // Fecha o menu imediatamente de forma garantida
+    const menu = document.getElementById('menu');
+    const overlay = document.getElementById('overlay');
+    menu.classList.remove('active');
+    overlay.classList.remove('active');
+
+    // Limpa o input para permitir nova seleção
+    e.target.value = '';
+
+    // Mostra mensagem de processamento
+    const processingMessage = document.getElementById('processing-message');
+    processingMessage.textContent = "Verificando arquivo...";
     processingMessage.style.display = 'block';
 
     try {
+        // Verificação EXTRA do tipo de arquivo
+        if (!file.name.toLowerCase().endsWith('.pdf')) {
+            throw new Error("O arquivo selecionado não é um PDF válido");
+        }
+
+        // Processamento do PDF com tratamento completo
         const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
         
-        // Configuração robusta para PDF.js
-        const loadingTask = pdfjsLib.getDocument({
-            data: arrayBuffer,
-            cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.11.338/cmaps/',
-            cMapPacked: true,
-            disableFontFace: true,
-            verbosity: 0
-        });
-
-        const pdf = await loadingTask.promise;
+        // Extração de texto com verificações
         let fullText = '';
-
-        // Processa no máximo as 5 primeiras páginas para teste
-        for (let i = 1; i <= Math.min(pdf.numPages, 5); i++) {
-            const page = await pdf.getPage(i);
-            const textContent = await page.getTextContent();
-            
-            // Extração segura de texto
-            const pageText = textContent.items
-                .map(item => item.str)
-                .join(' ')
-                .replace(/[^\w\s.,:;!?()-]/g, '') // Remove caracteres especiais
-                .trim();
-            
-            if (pageText) {
-                fullText += pageText + '\n\n';
-            }
-        }
-
-        // Verificação final do conteúdo
-        if (!fullText.trim()) {
-            throw new Error("O PDF não contém texto extraível");
-        }
-
-        // Atualiza a exibição corretamente
-        if (isQAMode) {
-            items = [{ question: "Conteúdo do PDF", answer: fullText }];
-        } else {
-            items = [{ text: fullText }];
-        }
+        const page = await pdf.getPage(1);
+        const textContent = await page.getTextContent();
         
-        currentIndex = 0;
-        updateDisplay();
+        if (textContent.items.length === 0) {
+            throw new Error("PDF não contém texto legível");
+        }
 
+        fullText = textContent.items.map(item => item.str).join(' ');
+
+        // Atualização garantida da interface
+        document.getElementById('question').textContent = "Conteúdo do PDF";
+        document.getElementById('answer').textContent = fullText;
+        document.getElementById('answer').classList.add('visible');
+        
     } catch (error) {
-        console.error("Erro ao processar PDF:", error);
-        items = [{
-            question: "ERRO: PDF não pode ser lido",
-            answer: `Motivo: ${error.message}\n\n` +
-                   `Este PDF pode ser uma imagem ou estar protegido.` +
-                   `Tente converter para texto primeiro.`
-        }];
-        currentIndex = 0;
-        updateDisplay();
+        console.error("Falha crítica:", error);
+        
+        // Mensagem de erro garantida
+        document.getElementById('question').textContent = "ERRO";
+        document.getElementById('answer').textContent = `Não foi possível ler o PDF: ${error.message}`;
+        document.getElementById('answer').classList.add('visible');
     } finally {
+        // Garante que a mensagem some e o menu feche
         processingMessage.style.display = 'none';
+        document.getElementById('file-input').value = '';
     }
-}
-            
+}            
             function exportFile() {
                 if (items.length === 0) return;
                 
