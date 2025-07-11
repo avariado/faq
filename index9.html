@@ -1184,9 +1184,8 @@
                         // Método melhorado para extrair texto mantendo a ordem
                         const viewport = page.getViewport({ scale: 1.0 });
                         const textItems = textContent.items.map(item => {
-                            const tx = pdfjsLib.Util.transform(
-                                pdfjsLib.Util.transform(viewport.transform, item.transform),
-                                [x, y] = pdfjsLib.Util.applyTransform([item.transform[4], [item.transform[5]], tx);
+                        const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+                        const [x, y] = pdfjsLib.Util.applyTransform([item.transform[4], item.transform[5]], tx);
                             
                             return {
                                 text: item.str,
