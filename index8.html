@@ -566,7 +566,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
     <script>
-        // Configuração do PDF.js
+        // Configuração do PDF.js para evitar problemas com CORS
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
 
         function adjustViewport() {
@@ -1103,7 +1103,7 @@
                 toggleMenu();
                 
                 if (file.name.endsWith('.pdf')) {
-                    File(file);
+                    processPDFFile(file);
                 } else {
                     processTextFile(file);
                 }
@@ -1152,105 +1152,212 @@
                 
                 reader.readAsArrayBuffer(file);
             }
-            
-async function handleFileImport(e) {
-    const file = e.target.files[0];
-    if (!file) return;
 
-    // Fecha o menu imediatamente de forma garantida
-    const menu = document.getElementById('menu');
-    const overlay = document.getElementById('overlay');
-    menu.classList.remove('active');
-    overlay.classList.remove('active');
-
-    // Limpa o input para permitir nova seleção
-    e.target.value = '';
-
-    // Mostra mensagem de processamento
-    const processingMessage = document.getElementById('processing-message');
-    processingMessage.textContent = "Verificando arquivo...";
+async function processPDFFile(file) {
     processingMessage.style.display = 'block';
-
-    try {
-        // Verificação EXTRA do tipo de arquivo
-        if (!file.name.toLowerCase().endsWith('.pdf')) {
-            throw new Error("O arquivo selecionado não é um PDF válido");
-        }
-
-        // Processamento do PDF com tratamento completo
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-        
-        // Extração de texto com verificações
-        let fullText = '';
-        const page = await pdf.getPage(1);
-        const textContent = await page.getTextContent();
-        
-        if (textContent.items.length === 0) {
-            throw new Error("PDF não contém texto legível");
-        }
-
-        fullText = textContent.items.map(item => item.str).join(' ');
-
-        // Atualização garantida da interface
-        document.getElementById('question').textContent = "Conteúdo do PDF";
-        document.getElementById('answer').textContent = fullText;
-        document.getElementById('answer').classList.add('visible');
-        
-    } catch (error) {
-        console.error("Falha crítica:", error);
-        
-        // Mensagem de erro garantida
-        document.getElementById('question').textContent = "ERRO";
-        document.getElementById('answer').textContent = `Não foi possível ler o PDF: ${error.message}`;
-        document.getElementById('answer').classList.add('visible');
-    } finally {
-        // Garante que a mensagem some e o menu feche
-        processingMessage.style.display = 'none';
-        document.getElementById('file-input').value = '';
-    }
-}   
-
- async function processPDFFile(file) {
-    const processingMessage = document.getElementById('processingMessage');
-    processingMessage.style.display = 'block';
-
+    
     try {
         const arrayBuffer = await file.arrayBuffer();
-
-        // Verifica se é um ficheiro PDF pelo header
-        const uint8Array = new Uint8Array(arrayBuffer);
-        const header = new TextDecoder().decode(uint8Array.slice(0, 5));
-        if (!header.startsWith('%PDF-')) {
-            throw new Error('O ficheiro selecionado não parece ser um PDF válido.');
-        }
-
-        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        
+        // Configuração para melhorar a extração de texto
+        const loadingTask = pdfjsLib.getDocument({
+            data: arrayBuffer,
+            // Aumentar o tamanho máximo do worker para PDFs complexos
+            maxImageSize: 1024 * 1024,
+            // Habilitar suporte para PDFs com fontes complexas
+            isEvalSupported: false,
+            disableFontFace: false,
+            useSystemFonts: false,
+            disableRange: true,
+            disableStream: false,
+            disableAutoFetch: false
+        });
+        
         const pdf = await loadingTask.promise;
-
+        
         let fullText = '';
-
+        let pageTextPromises = [];
+        
+        // Processar todas as páginas em paralelo para melhor performance
         for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const textContent = await page.getTextContent();
-            const textItems = textContent.items.map(item => item.str);
-            fullText += textItems.join(' ') + '\n';
+            pageTextPromises.push(
+                pdf.getPage(i).then(async page => {
+                    const textContent = await page.getTextContent({
+                        // Configurações para melhor extração de texto
+                        normalizeWhitespace: true,
+                        disableCombineTextItems: false
+                    });
+                    
+                    // Método mais robusto para extrair texto mantendo a estrutura
+                    const textItems = textContent.items;
+                    let lastY = 0;
+                    let pageText = '';
+                    
+                    for (let j = 0; j < textItems.length; j++) {
+                        const item = textItems[j];
+                        
+                        // Adicionar quebra de linha quando há mudança significativa na posição Y
+                        if (j > 0 && Math.abs(item.transform[5] - lastY) > 10) {
+                            pageText += '\n';
+                        }
+                        
+                        pageText += item.str + ' ';
+                        lastY = item.transform[5];
+                    }
+                    
+                    return pageText;
+                }).catch(err => {
+                    console.error(`Erro ao processar página ${i}:`, err);
+                    return ''; // Retorna string vazia para páginas com erro
+                })
+            );
         }
-
-        if (fullText.trim() === '') {
-            alert('Este PDF não contém texto pesquisável. Pode ser uma imagem.');
+        
+        // Aguardar todas as páginas serem processadas
+        const pagesText = await Promise.all(pageTextPromises);
+        fullText = pagesText.join('\n\n');
+        
+        // Limpeza do texto extraído
+        fullText = cleanExtractedText(fullText);
+        
+        // Tentar detectar automaticamente o formato (Q&A ou texto)
+        if (detectQAFormat(fullText)) {
+            parseQAContent(fullText);
+        } else {
+            parseTextContent(fullText);
         }
-
-        parseTextContent(fullText);
+        
         updateDisplay();
-
     } catch (error) {
-        alert('Erro ao processar o PDF: ' + error.message);
-        console.error(error);
+        console.error('Erro ao processar PDF:', error);
+        
+        // Tentativa alternativa para PDFs que falham na extração padrão
+        try {
+            const fallbackText = await tryFallbackPDFExtraction(file);
+            parseTextContent(fallbackText);
+            updateDisplay();
+        } catch (fallbackError) {
+            alert('Erro ao processar o PDF. O arquivo pode estar corrompido ou protegido. Detalhes: ' + error.message);
+        }
     } finally {
         processingMessage.style.display = 'none';
     }
-}           
+}
+
+// Função auxiliar para limpar o texto extraído do PDF
+function cleanExtractedText(text) {
+    // Remover hífens no final de linhas e juntar palavras
+    text = text.replace(/(\w)-\s+(\w)/g, '$1$2');
+    
+    // Remover múltiplos espaços e quebras de linha
+    text = text.replace(/\s+/g, ' ');
+    text = text.replace(/\n+/g, '\n');
+    
+    // Corrigir problemas comuns de codificação
+    text = text.replace(/â€“/g, '-');
+    text = text.replace(/â€™/g, "'");
+    text = text.replace(/â€œ/g, '"');
+    text = text.replace(/â€/g, '"');
+    
+    return text.trim();
+}
+
+// Função para tentar detectar automaticamente formato Q&A
+function detectQAFormat(text) {
+    const lines = text.split('\n');
+    let qaPairs = 0;
+    let totalLines = 0;
+    
+    // Verificar padrões comuns de perguntas e respostas
+    for (let i = 0; i < lines.length - 1; i++) {
+        const line = lines[i].trim();
+        const nextLine = lines[i + 1].trim();
+        
+        // Padrão: linha termina com ? e próxima linha não
+        if (line.endsWith('?') && !nextLine.endsWith('?')) {
+            qaPairs++;
+        }
+        // Padrão: linha começa com "Q:" ou "P:" e próxima com "R:" ou "A:"
+        else if ((line.match(/^(Q:|P:)/i) && nextLine.match(/^(R:|A:)/i)) {
+            qaPairs++;
+        }
+        
+        totalLines++;
+    }
+    
+    // Se pelo menos 30% das linhas seguem padrão Q&A, assumir que é Q&A
+    return qaPairs > 0 && (qaPairs / totalLines) > 0.3;
+}
+
+// Método alternativo para extração de PDFs problemáticos
+async function tryFallbackPDFExtraction(file) {
+    // Tentativa 1: Usar API de OCR.js (requer biblioteca adicional)
+    if (typeof OCRAD !== 'undefined') {
+        const imageText = await extractTextFromPDFImages(file);
+        return imageText;
+    }
+    
+    // Tentativa 2: Usar PDF.js com configuração diferente
+    const arrayBuffer = await file.arrayBuffer();
+    const loadingTask = pdfjsLib.getDocument({
+        data: arrayBuffer,
+        disableFontFace: true,
+        useSystemFonts: true
+    });
+    
+    const pdf = await loadingTask.promise;
+    let fullText = '';
+    
+    for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent({
+            disableCombineTextItems: true
+        });
+        
+        // Extrair texto item por item, sem tentar combinar
+        const textItems = textContent.items.map(item => item.str);
+        fullText += textItems.join('') + '\n';
+    }
+    
+    return fullText;
+}
+
+// Função para extrair texto de PDFs baseados em imagem (requer OCR.js)
+async function extractTextFromPDFImages(file) {
+    // Esta implementação requer a biblioteca OCR.js
+    // É apenas um esboço da abordagem possível
+    console.warn("Usando OCR como fallback - precisão pode ser menor");
+    
+    const arrayBuffer = await file.arrayBuffer();
+    const loadingTask = pdfjsLib.getDocument(arrayBuffer);
+    const pdf = await loadingTask.promise;
+    
+    let fullText = '';
+    
+    for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: 2.0 });
+        
+        // Criar canvas para renderizar a página
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        
+        await page.render({
+            canvasContext: context,
+            viewport: viewport
+        }).promise;
+        
+        // Usar OCR.js para extrair texto da imagem
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        const text = OCRAD(imageData);
+        fullText += text + '\n';
+    }
+    
+    return fullText;
+}
+
             function exportFile() {
                 if (items.length === 0) return;
                 
