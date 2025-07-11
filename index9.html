@@ -1155,42 +1155,42 @@
                 reader.readAsArrayBuffer(file);
             }
 
- async function processPDFFile(file) {
-    processingMessage.style.display = 'block';
-    
-    try {
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        
-        let fullText = '';
-        
-        for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const textContent = await page.getTextContent();
-            const textItems = textContent.items.map(item => item.str);
-            fullText += textItems.join(' ') + '\n\n';
-        }
-        
-        // Verifica se o texto parece ser no formato Q&A
-        const hasQuestions = fullText.match(/(pergunta|question|^[0-9]+[.)]\s|^\s*\?)/mi);
-        const hasAnswers = fullText.match(/(resposta|answer|^\s*:/mi);
-        
-        if (hasQuestions && hasAnswers) {
-            // Tenta parsear como Q&A
-            parseQAContent(fullText);
-        } else {
-            // Caso contrário, trata como texto contínuo
-            parseTextContent(fullText);
-        }
-        
-        updateDisplay();
-    } catch (error) {
-        alert('Erro ao processar o PDF: ' + error.message);
-        console.error(error);
-    } finally {
-        processingMessage.style.display = 'none';
-    }
-}
+            async function processPDFFile(file) {
+                processingMessage.style.display = 'block';
+                
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    
+                    let fullText = '';
+                    
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        const textItems = textContent.items.map(item => item.str);
+                        fullText += textItems.join(' ') + '\n\n';
+                    }
+                    
+                    // Verifica se o texto parece ser no formato Q&A
+                    const hasQuestions = fullText.match(/(pergunta|question|^[0-9]+[.)]\s|^\s*\?)/mi);
+                    const hasAnswers = fullText.match(/(resposta|answer|^\s*:/mi);
+                    
+                    if (hasQuestions && hasAnswers) {
+                        // Tenta parsear como Q&A
+                        parseQAContent(fullText);
+                    } else {
+                        // Caso contrário, trata como texto contínuo
+                        parseTextContent(fullText);
+                    }
+                    
+                    updateDisplay();
+                } catch (error) {
+                    alert('Erro ao processar o PDF: ' + error.message);
+                    console.error(error);
+                } finally {
+                    processingMessage.style.display = 'none';
+                }
+            }
 
             function exportFile() {
                 if (items.length === 0) return;
