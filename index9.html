@@ -1173,81 +1173,88 @@ async function isFileActuallyPDF(file) {
             
 async function processPDFFile(file) {
     const processingMessage = document.getElementById('processing-message');
-    processingMessage.textContent = "A processar PDF...";
+    processingMessage.textContent = "Processando PDF...";
     processingMessage.style.display = 'block';
 
     try {
-        // 1. Verificação HEXADECIMAL do cabeçalho do arquivo (garante que é PDF)
-        const headerCheck = await new Promise((resolve) => {
+        // 1. Verificação do cabeçalho do PDF
+        const isPDF = await new Promise((resolve) => {
             const reader = new FileReader();
             reader.onload = (e) => {
                 const arr = new Uint8Array(e.target.result.slice(0, 4));
-                resolve(Array.from(arr).map(b => b.toString(16)).join('') === '25504446');
+                const header = Array.from(arr).map(b => b.toString(16)).join('');
+                resolve(header === '25504446'); // %PDF em hexadecimal
             };
             reader.readAsArrayBuffer(file.slice(0, 4));
         });
 
-        if (!headerCheck) {
-            throw new Error("O arquivo não é um PDF válido (cabeçalho inválido)");
+        if (!isPDF) {
+            throw new Error("O arquivo não é um PDF válido");
         }
 
-        // 2. Carregamento otimizado do PDF
+        // 2. Carregamento do PDF com configurações otimizadas
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({
             data: arrayBuffer,
             cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
-            cMapPacked: true,
-            disableFontFace: false,
-            useSystemFonts: false
+            cMapPacked: true
         }).promise;
 
-        // 3. Extração de texto com preservação de formatação
+        // 3. Processamento seguro das páginas
         let fullText = '';
+        
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
-            const textContent = await page.getTextContent({
-                normalizeWhitespace: false,
-                disableCombineTextItems: false,
-                includeMarkedContent: true
-            });
-
-            // Processamento inteligente por bloco de texto
-            let pageText = '';
-            let lastY = 0;
+            const textContent = await page.getTextContent();
             
-            textContent.items.forEach((item) => {
-                // Preserva quebras de linha naturais
-                if (item.transform[5] !== lastY) {
-                    pageText += '\n';
-                    lastY = item.transform[5];
-                }
-                pageText += item.str + ' ';
-            });
+            // Processamento seguro dos itens de texto
+            const pageText = textContent.items
+                .map(item => {
+                    // Verificação segura da propriedade transform
+                    const yPos = item.transform ? item.transform[5] : 0;
+                    return {
+                        text: item.str,
+                        yPos: yPos
+                    };
+                })
+                // Ordena por posição vertical (Y)
+                .sort((a, b) => b.yPos - a.yPos)
+                // Agrupa por linha
+                .reduce((acc, curr, index, array) => {
+                    if (index === 0 || Math.abs(curr.yPos - array[index-1].yPos) > 5) {
+                        acc.push([curr]);
+                    } else {
+                        acc[acc.length-1].push(curr);
+                    }
+                    return acc;
+                }, [])
+                // Concatena o texto
+                .map(line => line.map(item => item.text).join(' '))
+                .join('\n');
 
-            fullText += pageText.replace(/\s+/g, ' ').trim() + '\n\n';
+            fullText += pageText + '\n\n';
         }
 
-        // 4. Detecção automática do formato (Q&A ou texto contínuo)
-        const isQnAFormat = /(pergunta|question|resposta|answer|:\s*$|\?\s*$)/mi.test(fullText);
+        // 4. Detecção do formato (Q&A ou texto normal)
+        const lineCount = fullText.split('\n').length;
+        const questionCount = (fullText.match(/\?/g) || []).length;
         
-        if (isQnAFormat) {
+        if (questionCount > 0 && questionCount/lineCount > 0.1) {
             parseQAContent(fullText);
         } else {
             parseTextContent(fullText);
         }
 
-        updateDisplay();
-
     } catch (error) {
-        console.error("ERRO DETALHADO:", error);
+        console.error("Erro no processamento:", error);
         
-        // Fallback para processamento como texto se for PDF corrompido
-        if (error.message.includes("Invalid PDF") || error.message.includes("cabeçalho inválido")) {
-            processingMessage.textContent = "PDF inválido - Tentando como texto...";
-            await new Promise(resolve => setTimeout(resolve, 1000));
+        // Fallback para processamento como texto simples
+        if (error.message.includes("Invalid PDF") || error.message.includes("cabeçalho")) {
+            processingMessage.textContent = "Tentando como arquivo de texto...";
+            await new Promise(resolve => setTimeout(resolve, 1500));
             processTextFile(file);
         } else {
-            alert(`Falha crítica: ${error.message}`);
+            alert(`Erro: ${error.message}\nConsulte o console para detalhes.`);
         }
     } finally {
         processingMessage.style.display = 'none';
