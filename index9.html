@@ -564,10 +564,10 @@
     
     <div class="processing-message" id="processing-message">Processando PDF...</div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
     <script>
         // Configuração do PDF.js para evitar problemas com CORS
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
 
         function adjustViewport() {
             const vh = window.innerHeight * 0.01;
@@ -634,9 +634,7 @@
             let searchResults = [];
             let currentSearchIndex = -1;
             let isFirstSearchClick = true;
-            
-            window.pdfjsLib = pdfjsLib;
-            
+
             loadSampleData();
             updateDisplay();
             updateFontSize();
@@ -1160,7 +1158,8 @@
                 
                 try {
                     const arrayBuffer = await file.arrayBuffer();
-                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    const loadingTask = pdfjsLib.getDocument(arrayBuffer);
+                    const pdf = await loadingTask.promise;
                     
                     let fullText = '';
                     
@@ -1168,25 +1167,13 @@
                         const page = await pdf.getPage(i);
                         const textContent = await page.getTextContent();
                         const textItems = textContent.items.map(item => item.str);
-                        fullText += textItems.join(' ') + '\n\n';
+                        fullText += textItems.join(' ') + '\n';
                     }
                     
-                    // Verifica se o texto parece ser no formato Q&A
-                    const hasQuestions = fullText.match(/(pergunta|question|^[0-9]+[.)]\s|^\s*\?)/mi);
-                    const hasAnswers = fullText.match(/(resposta|answer|^\s*:/mi);
-                    
-                    if (hasQuestions && hasAnswers) {
-                        // Tenta parsear como Q&A
-                        parseQAContent(fullText);
-                    } else {
-                        // Caso contrário, trata como texto contínuo
-                        parseTextContent(fullText);
-                    }
-                    
+                    parseTextContent(fullText);
                     updateDisplay();
                 } catch (error) {
                     alert('Erro ao processar o PDF: ' + error.message);
-                    console.error(error);
                 } finally {
                     processingMessage.style.display = 'none';
                 }
