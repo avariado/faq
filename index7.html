@@ -1153,70 +1153,88 @@
                 reader.readAsArrayBuffer(file);
             }
 
-            async function processPDFFile(file) {
-                processingMessage.style.display = 'block';
+        async function processPDFFile(file) {
+            processingMessage.style.display = 'block';
+            
+            try {
+                const arrayBuffer = await file.arrayBuffer();
                 
-                try {
-                    const arrayBuffer = await file.arrayBuffer();
-                    const loadingTask = pdfjsLib.getDocument({
-                        data: arrayBuffer,
-                        // Configurações para melhorar extração de texto
-                        cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.11.338/cmaps/',
-                        cMapPacked: true,
-                        disableFontFace: false,
-                        verbosity: 0
+                // Configurações otimizadas para extração de texto
+                const loadingTask = pdfjsLib.getDocument({
+                    data: arrayBuffer,
+                    cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.11.338/cmaps/',
+                    cMapPacked: true,
+                    disableFontFace: false,
+                    verbosity: 0,
+                    enableXfa: false,
+                    isEvalSupported: false,
+                    useSystemFonts: true
+                });
+                
+                const pdf = await loadingTask.promise;
+                let fullText = '';
+                
+                // Processar cada página do PDF
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    
+                    // Configurações otimizadas para extração de texto
+                    const textContent = await page.getTextContent({
+                        normalizeWhitespace: true,
+                        disableCombineTextItems: false,
+                        includeMarkedContent: false
                     });
                     
-                    const pdf = await loadingTask.promise;
-                    
-                    let fullText = '';
-                    
-                    for (let i = 1; i <= pdf.numPages; i++) {
-                        const page = await pdf.getPage(i);
-                        
-                        // Configurações para melhorar extração de texto
-                        const textContent = await page.getTextContent({
-                            normalizeWhitespace: true,
-                            disableCombineTextItems: false
-                        });
-                        
-                        // Processar os itens de texto
-                        const textItems = textContent.items.map(item => {
-                            // Remover caracteres não imprimíveis e espaços em excesso
-                            let text = item.str.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
-                            text = text.replace(/\s+/g, ' ').trim();
+                    // Extrair e limpar o texto
+                    const pageText = textContent.items
+                        .map(item => {
+                            // Limpar caracteres especiais e normalizar espaços
+                            let text = item.str
+                                .replace(/[\x00-\x1F\x7F-\x9F]/g, '')  // Remover caracteres não imprimíveis
+                                .replace(/\s+/g, ' ')                  // Normalizar espaços
+                                .trim();
+                            
+                            // Adicionar quebra de linha após títulos ou seções
+                            if (text.endsWith(':')) {
+                                text += '\n';
+                            }
                             return text;
-                        });
-                        
-                        fullText += textItems.join(' ') + '\n';
-                    }
+                        })
+                        .join(' ');
                     
-                    // Processar o texto extraído
-                    fullText = fullText.replace(/(\r\n|\n|\r)/gm, ' ');
-                    fullText = fullText.replace(/\s+/g, ' ').trim();
-                    
-                    // Verificar se o texto parece ser estruturado como Q&A
-                    const hasTabs = fullText.includes('\t');
-                    const hasDoubleSemicolon = fullText.includes(';;');
-                    const isAlternatingLines = checkAlternatingLinesFormat(fullText);
-                    
-                    if (hasTabs || hasDoubleSemicolon) {
-                        parseQAContent(fullText);
-                    } else if (isAlternatingLines) {
-                        parseAlternatingLinesContent(fullText);
-                    } else {
-                        parseTextContent(fullText);
-                    }
-                    
-                    updateDisplay();
-                } catch (error) {
-                    console.error('Erro detalhado ao processar PDF:', error);
-                    alert('Erro ao processar o PDF. O arquivo pode estar protegido ou não conter texto legível.');
-                } finally {
-                    processingMessage.style.display = 'none';
+                    fullText += pageText + '\n\n';
                 }
+                
+                // Pós-processamento do texto extraído
+                fullText = fullText
+                    .replace(/(\n\s*){3,}/g, '\n\n')  // Remover múltiplas quebras de linha
+                    .replace(/\s*\.\s*/g, '. ')        // Normalizar pontos
+                    .replace(/\s*,\s*/g, ', ')         // Normalizar vírgulas
+                    .replace(/\s*:\s*/g, ': ')         // Normalizar dois pontos
+                    .trim();
+                
+                // Verificar se o texto parece ser estruturado como Q&A
+                const hasTabs = fullText.includes('\t');
+                const hasDoubleSemicolon = fullText.includes(';;');
+                const isAlternatingLines = checkAlternatingLinesFormat(fullText);
+                
+                if (hasTabs || hasDoubleSemicolon) {
+                    parseQAContent(fullText);
+                } else if (isAlternatingLines) {
+                    parseAlternatingLinesContent(fullText);
+                } else {
+                    parseTextContent(fullText);
+                }
+                
+                updateDisplay();
+            } catch (error) {
+                console.error('Erro detalhado ao processar PDF:', error);
+                alert('Erro ao processar o PDF. O arquivo pode estar protegido ou não conter texto legível. Detalhes: ' + error.message);
+            } finally {
+                processingMessage.style.display = 'none';
             }
-
+        }
+            
             function exportFile() {
                 if (items.length === 0) return;
                 
