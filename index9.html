@@ -1097,22 +1097,25 @@
                 adjustInputWidth();
             }
 
-            function handleFileImport(e) {
-                const file = e.target.files[0];
-                if (!file) return;
-                
-                // Fechar o menu imediatamente
-                toggleMenu();
-                
-                if (file.name.endsWith('.pdf')) {
-                    processPDFFile(file);
-                } else {
-                    processTextFile(file);
-                }
-                
-                // Limpar o input para permitir a seleção do mesmo arquivo novamente
-                e.target.value = '';
-            }
+function handleFileImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Fechar o menu imediatamente
+    toggleMenu();
+
+    // Verificação MIME Type mais robusta
+    if (file.type === 'application/pdf' || 
+        file.name.toLowerCase().endsWith('.pdf') || 
+        isFileActuallyPDF(file)) {
+        processPDFFile(file);
+    } else {
+        processTextFile(file);
+    }
+
+    // Limpar o input
+    e.target.value = '';
+}
 
             function processTextFile(file) {
                 const reader = new FileReader();
@@ -1155,50 +1158,97 @@
                 reader.readAsArrayBuffer(file);
             }
 
+async function isFileActuallyPDF(file) {
+    // Verifica os primeiros bytes do arquivo para a assinatura PDF
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const arr = new Uint8Array(e.target.result.slice(0, 4));
+            const header = Array.from(arr).map(b => b.toString(16)).join('');
+            resolve(header === '25504446'); // %PDF em hexadecimal
+        };
+        reader.readAsArrayBuffer(file.slice(0, 4));
+    });
+}
+            
 async function processPDFFile(file) {
     const processingMessage = document.getElementById('processing-message');
+    processingMessage.textContent = "A processar PDF...";
     processingMessage.style.display = 'block';
-    
+
     try {
-        // 1. Carrega o arquivo PDF
+        // 1. Verificação HEXADECIMAL do cabeçalho do arquivo (garante que é PDF)
+        const headerCheck = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const arr = new Uint8Array(e.target.result.slice(0, 4));
+                resolve(Array.from(arr).map(b => b.toString(16)).join('') === '25504446');
+            };
+            reader.readAsArrayBuffer(file.slice(0, 4));
+        });
+
+        if (!headerCheck) {
+            throw new Error("O arquivo não é um PDF válido (cabeçalho inválido)");
+        }
+
+        // 2. Carregamento otimizado do PDF
         const arrayBuffer = await file.arrayBuffer();
-        
-        // 2. Configurações otimizadas para o PDF.js
         const pdf = await pdfjsLib.getDocument({
             data: arrayBuffer,
             cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
-            cMapPacked: true
+            cMapPacked: true,
+            disableFontFace: false,
+            useSystemFonts: false
         }).promise;
 
+        // 3. Extração de texto com preservação de formatação
         let fullText = '';
-        
-        // 3. Processa cada página
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent({
-                normalizeWhitespace: true,
-                disableCombineTextItems: false
+                normalizeWhitespace: false,
+                disableCombineTextItems: false,
+                includeMarkedContent: true
             });
+
+            // Processamento inteligente por bloco de texto
+            let pageText = '';
+            let lastY = 0;
             
-            // 4. Extrai e formata o texto corretamente
-            const pageText = textContent.items.map(item => item.str).join(' ');
-            fullText += pageText + '\n\n';
+            textContent.items.forEach((item) => {
+                // Preserva quebras de linha naturais
+                if (item.transform[5] !== lastY) {
+                    pageText += '\n';
+                    lastY = item.transform[5];
+                }
+                pageText += item.str + ' ';
+            });
+
+            fullText += pageText.replace(/\s+/g, ' ').trim() + '\n\n';
         }
 
-        // 5. Processa o texto extraído
-        const hasQAFormat = /(pergunta|question|resposta|answer|:|\?)/mi.test(fullText);
+        // 4. Detecção automática do formato (Q&A ou texto contínuo)
+        const isQnAFormat = /(pergunta|question|resposta|answer|:\s*$|\?\s*$)/mi.test(fullText);
         
-        if (hasQAFormat) {
+        if (isQnAFormat) {
             parseQAContent(fullText);
         } else {
             parseTextContent(fullText);
         }
-        
+
         updateDisplay();
-        
+
     } catch (error) {
-        console.error("Erro detalhado:", error);
-        alert('Erro ao processar PDF: ' + error.message);
+        console.error("ERRO DETALHADO:", error);
+        
+        // Fallback para processamento como texto se for PDF corrompido
+        if (error.message.includes("Invalid PDF") || error.message.includes("cabeçalho inválido")) {
+            processingMessage.textContent = "PDF inválido - Tentando como texto...";
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            processTextFile(file);
+        } else {
+            alert(`Falha crítica: ${error.message}`);
+        }
     } finally {
         processingMessage.style.display = 'none';
     }
