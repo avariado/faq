@@ -898,54 +898,35 @@
                 }
             }
 
-            function parseQAContent(text) {
+             function parseQAContent(text) {
                 const lines = text.split('\n');
                 items = [];
                 originalItems = [];
                 
-                // Determinar o separador usado (;; ou tab) e manter os espaços
-                const hasTabs = text.includes('\t');
-                const hasDoubleSemicolon = text.includes(';;');
+                // Detectar automaticamente o separador exato (com ou sem espaços)
+                const separatorMatch = text.match(/(\s*;;\s*|\t)/);
+                originalSeparator = separatorMatch ? separatorMatch[0] : null;
                 
-                if (hasDoubleSemicolon) {
-                    // Usar o padrão " ;; " como separador, mantendo os espaços
-                    originalSeparator = ' ;; ';
-                    
-                    for (const line of lines) {
-                        if (line.trim() === '') continue;
-                        
-                        // Dividir mantendo os espaços originais
-                        const parts = line.split(originalSeparator);
-                        
-                        if (parts.length >= 2) {
-                            const question = parts[0].trim();
-                            const answer = parts.slice(1).join(originalSeparator).trim();
-                            items.push({ question, answer });
-                        } else {
-                            items.push({ text: line.trim() });
-                        }
-                    }
-                } else if (hasTabs) {
-                    // Usar tab como separador
-                    originalSeparator = '\t';
-                    
-                    for (const line of lines) {
-                        if (line.trim() === '') continue;
-                        
-                        const parts = line.split('\t');
-                        
-                        if (parts.length >= 2) {
-                            const question = parts[0].trim();
-                            const answer = parts.slice(1).join('\t').trim();
-                            items.push({ question, answer });
-                        } else {
-                            items.push({ text: line.trim() });
-                        }
-                    }
-                } else {
-                    // Se não encontrar nenhum separador, tratar como texto simples
+                // Se não encontrar nenhum separador válido
+                if (!originalSeparator) {
                     parseTextContent(text);
                     return;
+                }
+                
+                // Processar linhas com o separador detectado
+                for (const line of lines) {
+                    if (line.trim() === '') continue;
+                    
+                    const parts = line.split(originalSeparator);
+                    
+                    if (parts.length >= 2) {
+                        const question = parts[0].trim();
+                        const answer = parts.slice(1).join(originalSeparator).trim();
+                        items.push({ question, answer });
+                    } else {
+                        // Se a linha não contiver o separador, trata como texto simples
+                        items.push({ text: line.trim() });
+                    }
                 }
                 
                 originalItems = [...items];
