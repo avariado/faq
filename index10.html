@@ -215,6 +215,8 @@
             transition: left 0.3s;
             overflow-y: auto;
             padding: 20px;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
         }
 
         #menu.active {
@@ -373,21 +375,21 @@
 
         .search-buttons {
             display: flex;
-            gap: 15px; /* Aumentado o espaçamento entre os botões */
+            gap: 15px; /* Aumentado de 5px para 15px */
             justify-content: center;
-            margin-top: 5px;
+            margin-top: 10px;
         }
 
         .search-btn {
-            width: 36px; /* Aumentado o tamanho dos botões */
-            height: 36px;
+            width: 36px; /* Aumentado de 30px */
+            height: 36px; /* Aumentado de 30px */
             padding: 0;
             background-color: #6200ee;
             color: white;
             border: none;
             border-radius: 50%;
             cursor: pointer;
-            font-size: 16px; /* Aumentado o tamanho da fonte */
+            font-size: 16px; /* Aumentado de 14px */
             display: flex;
             align-items: center;
             justify-content: center;
@@ -469,22 +471,6 @@
             }
             .counter-container {
                 font-size: 14px;
-            }
-        }
-
-        /* Melhorias para rolagem no modo horizontal */
-        @media (orientation: landscape) {
-            #card-content {
-                -webkit-overflow-scrolling: touch;
-                overflow-y: scroll;
-                scroll-behavior: smooth;
-                overscroll-behavior: contain;
-            }
-            
-            #menu {
-                max-height: 100vh;
-                overflow-y: auto;
-                overscroll-behavior: contain;
             }
         }
     </style>
@@ -650,6 +636,7 @@
             let searchResults = [];
             let currentSearchIndex = -1;
             let isFirstSearchClick = true;
+            let originalSeparator = '\t'; // Padrão inicial, será atualizado durante a importação
 
             loadSampleData();
             updateDisplay();
@@ -816,14 +803,21 @@
             function toggleMenu() {
                 menu.classList.toggle('active');
                 overlay.classList.toggle('active');
+                
+                // Quando o menu é aberto, rolar para o topo
+                if (menu.classList.contains('active')) {
+                    menu.scrollTo(0, 0);
+                }
             }
 
             function openEditModal() {
                 toggleMenu();
-                // Corrigido para manter o delimitador original (;;) ao editar
+                
+                // Usar o separador original (;; ou tab) ao exibir no editor
                 contentEditor.value = isQAMode 
-                    ? items.map(item => `${item.question};;${item.answer}`).join('\n')
+                    ? items.map(item => `${item.question}${originalSeparator}${item.answer}`).join('\n')
                     : items.map(item => item.text).join('\n');
+                    
                 editModal.classList.add('active');
                 overlay.classList.add('active');
             }
@@ -852,11 +846,14 @@
                     return;
                 }
                 
+                // Determinar o separador usado no conteúdo editado
                 const hasTabs = text.includes('\t');
                 const hasDoubleSemicolon = text.includes(';;');
                 const isAlternatingLines = checkAlternatingLinesFormat(text);
                 
                 if (hasTabs || hasDoubleSemicolon) {
+                    // Atualizar o separador original para o usado no editor
+                    originalSeparator = hasDoubleSemicolon ? ';;' : '\t';
                     parseQAContent(text);
                 } else if (isAlternatingLines) {
                     parseAlternatingLinesContent(text);
@@ -894,8 +891,9 @@
                     currentIndex = savedState.currentIndex || 0;
                     isQAMode = savedState.isQAMode;
                     baseFontSize = savedState.baseFontSize || 20;
+                    originalSeparator = savedState.originalSeparator || '\t';
                 } else {
-                    const sampleData = `O que é HTML?;;HTML é a linguagem de marcação padrão para criar páginas web.\nO que é CSS?;;CSS é a linguagem de estilos usada para descrever a apresentação de um documento HTML.`;
+                    const sampleData = `O que é HTML?\tHTML é a linguagem de marcação padrão para criar páginas web.\nO que é CSS?\tCSS é a linguagem de estilos usada para descrever a apresentação de um documento HTML.`;
                     parseQAContent(sampleData);
                 }
             }
@@ -905,10 +903,15 @@
                 items = [];
                 originalItems = [];
                 
+                // Determinar o separador usado (;; ou tab)
+                const hasTabs = text.includes('\t');
+                const hasDoubleSemicolon = text.includes(';;');
+                const separator = hasDoubleSemicolon ? ';;' : '\t';
+                originalSeparator = separator;
+                
                 for (const line of lines) {
                     if (line.trim() === '') continue;
                     
-                    const separator = line.includes(';;') ? ';;' : '\t';
                     const parts = line.split(separator);
                     
                     if (parts.length >= 2) {
@@ -1294,7 +1297,8 @@
                 
                 let content;
                 if (isQAMode) {
-                    content = items.map(item => `${item.question};;${item.answer}`).join('\n');
+                    // Usar o separador original (;; ou tab) ao exportar
+                    content = items.map(item => `${item.question}${originalSeparator}${item.answer}`).join('\n');
                 } else {
                     content = items.map(item => item.text).join('\n');
                 }
@@ -1363,7 +1367,8 @@
                     originalItems,
                     currentIndex,
                     isQAMode,
-                    baseFontSize
+                    baseFontSize,
+                    originalSeparator
                 };
                 localStorage.setItem('appState', JSON.stringify(state));
             }
