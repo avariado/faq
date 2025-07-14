@@ -373,21 +373,21 @@
 
         .search-buttons {
             display: flex;
-            gap: 5px;
+            gap: 15px; /* Aumentado o espaçamento entre os botões */
             justify-content: center;
             margin-top: 5px;
         }
 
         .search-btn {
-            width: 30px;
-            height: 30px;
+            width: 36px; /* Aumentado o tamanho dos botões */
+            height: 36px;
             padding: 0;
             background-color: #6200ee;
             color: white;
             border: none;
             border-radius: 50%;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 16px; /* Aumentado o tamanho da fonte */
             display: flex;
             align-items: center;
             justify-content: center;
@@ -469,6 +469,22 @@
             }
             .counter-container {
                 font-size: 14px;
+            }
+        }
+
+        /* Melhorias para rolagem no modo horizontal */
+        @media (orientation: landscape) {
+            #card-content {
+                -webkit-overflow-scrolling: touch;
+                overflow-y: scroll;
+                scroll-behavior: smooth;
+                overscroll-behavior: contain;
+            }
+            
+            #menu {
+                max-height: 100vh;
+                overflow-y: auto;
+                overscroll-behavior: contain;
             }
         }
     </style>
@@ -804,8 +820,9 @@
 
             function openEditModal() {
                 toggleMenu();
+                // Corrigido para manter o delimitador original (;;) ao editar
                 contentEditor.value = isQAMode 
-                    ? items.map(item => `${item.question}\t${item.answer}`).join('\n')
+                    ? items.map(item => `${item.question};;${item.answer}`).join('\n')
                     : items.map(item => item.text).join('\n');
                 editModal.classList.add('active');
                 overlay.classList.add('active');
@@ -878,7 +895,7 @@
                     isQAMode = savedState.isQAMode;
                     baseFontSize = savedState.baseFontSize || 20;
                 } else {
-                    const sampleData = `O que é HTML?\tHTML é a linguagem de marcação padrão para criar páginas web.\nO que é CSS?\tCSS é a linguagem de estilos usada para descrever a apresentação de um documento HTML.`;
+                    const sampleData = `O que é HTML?;;HTML é a linguagem de marcação padrão para criar páginas web.\nO que é CSS?;;CSS é a linguagem de estilos usada para descrever a apresentação de um documento HTML.`;
                     parseQAContent(sampleData);
                 }
             }
@@ -891,7 +908,7 @@
                 for (const line of lines) {
                     if (line.trim() === '') continue;
                     
-                    const separator = line.includes('\t') ? '\t' : ';;';
+                    const separator = line.includes(';;') ? ';;' : '\t';
                     const parts = line.split(separator);
                     
                     if (parts.length >= 2) {
@@ -1277,7 +1294,7 @@
                 
                 let content;
                 if (isQAMode) {
-                    content = items.map(item => `${item.question}\t${item.answer}`).join('\n');
+                    content = items.map(item => `${item.question};;${item.answer}`).join('\n');
                 } else {
                     content = items.map(item => item.text).join('\n');
                 }
