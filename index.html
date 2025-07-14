@@ -630,7 +630,7 @@
             let originalItems = [];
             let currentIndex = 0;
             let isQAMode = true;
-            let baseFontSize = parseInt(currentFontSizeEl.textContent) || 20;
+            let baseFontSize;
             let touchStartX = 0;
             let touchStartY = 0;
             let searchTerm = '';
@@ -890,12 +890,14 @@
                     originalItems = savedState.originalItems;
                     currentIndex = savedState.currentIndex || 0;
                     isQAMode = savedState.isQAMode;
-                    baseFontSize = savedState.baseFontSize || 20;
+                    baseFontSize = savedState.baseFontSize || 20; 
                     originalSeparator = savedState.originalSeparator || '\t';
                 } else {
                     const sampleData = `O que é HTML?\tHTML é a linguagem de marcação padrão para criar páginas web.\nO que é CSS?\tCSS é a linguagem de estilos usada para descrever a apresentação de um documento HTML.`;
+                    baseFontSize = 20; 
                     parseQAContent(sampleData);
                 }
+                updateFontSize(); 
             }
 
              function parseQAContent(text) {
