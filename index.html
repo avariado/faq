@@ -121,7 +121,6 @@
         }
 
         #question {
-            font-size: 24px;
             margin-bottom: 20px;
             word-wrap: break-word;
             padding: 10px;
@@ -135,7 +134,6 @@
         }
 
         #answer {
-            font-size: 20px;
             color: #666;
             word-wrap: break-word;
             padding: 10px;
@@ -632,7 +630,7 @@
             let originalItems = [];
             let currentIndex = 0;
             let isQAMode = true;
-            let baseFontSize = 20;
+            let baseFontSize = parseInt(currentFontSizeEl.textContent) || 20;
             let touchStartX = 0;
             let touchStartY = 0;
             let searchTerm = '';
@@ -1002,6 +1000,7 @@
                 if (items.length === 0) {
                     questionEl.textContent = "Nenhum conteúdo carregado.";
                     questionEl.style.fontSize = `${baseFontSize}px`;
+                    updateFontSize();
                     answerEl.style.fontSize = `${baseFontSize - 2}px`;
                     answerEl.textContent = "";
                     currentCardInput.value = "0";
@@ -1118,7 +1117,7 @@
 
             function updateFontSize() {
                 questionEl.style.fontSize = `${baseFontSize}px`;
-                answerEl.style.fontSize = `${baseFontSize - 2}px`;
+                answerEl.style.fontSize = `${Math.max(baseFontSize - 2, 12)}px`;
                 currentFontSizeEl.textContent = baseFontSize;
                 adjustInputWidth();
             }
