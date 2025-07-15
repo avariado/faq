@@ -550,18 +550,6 @@
         </div>
     </div>
 
-    <div id="export-modal" class="modal">
-        <h2>Exportar Ficheiro</h2>
-        <div class="export-modal-content">
-            <label for="export-filename">Nome do ficheiro:</label>
-            <input type="text" id="export-filename" value="perguntas_respostas.txt">
-            <div class="modal-buttons">
-                <button id="cancel-export" class="btn btn-secondary">Cancelar</button>
-                <button id="confirm-export" class="btn btn-primary">Exportar</button>
-            </div>
-        </div>
-    </div>
-
     <input type="file" id="file-input" accept=".txt,.pdf">
     <a id="file-export" download="perguntas_respostas.txt"></a>
     
@@ -1337,21 +1325,13 @@
                 const blob = new Blob([content], { type: 'text/plain' });
                 const url = URL.createObjectURL(blob);
                 
-                // Obter o nome do arquivo do input
-                let filename = exportFilenameInput.value.trim();
-                if (!filename) {
-                    filename = isQAMode ? 'perguntas_respostas.txt' : 'conteudo.txt';
-                }
-                
-                // Garantir que o arquivo tenha extensão .txt
-                if (!filename.toLowerCase().endsWith('.txt')) {
-                    filename += '.txt';
-                }
+                // Obter o nome do arquivo sugerido
+                let filename = isQAMode ? 'perguntas_respostas.txt' : 'conteudo.txt';
                 
                 // Usar a API File System Access se disponível (Chrome e Edge)
                 if ('showSaveFilePicker' in window) {
                     try {
-                        const fileHandlePromise = window.showSaveFilePicker({
+                        window.showSaveFilePicker({
                             suggestedName: filename,
                             types: [{
                                 description: 'Arquivos de Texto',
@@ -1359,29 +1339,39 @@
                                     'text/plain': ['.txt']
                                 }
                             }]
-                        });
-                        
-                        fileHandlePromise.then(async (fileHandle) => {
+                        }).then(async (fileHandle) => {
                             const writable = await fileHandle.createWritable();
                             await writable.write(blob);
                             await writable.close();
-                            closeExportModal();
+                            URL.revokeObjectURL(url);
                         }).catch(err => {
                             if (err.name !== 'AbortError') {
                                 console.error('Erro ao salvar arquivo:', err);
                                 // Fallback para o método tradicional
-                                fallbackExport(url, filename);
+                                triggerDownload(url, filename);
                             }
                         });
                     } catch (err) {
                         console.error('Erro ao usar File System Access API:', err);
                         // Fallback para o método tradicional
-                        fallbackExport(url, filename);
+                        triggerDownload(url, filename);
                     }
                 } else {
                     // Fallback para navegadores que não suportam File System Access API
-                    fallbackExport(url, filename);
+                    triggerDownload(url, filename);
                 }
+            }
+            
+            function triggerDownload(url, filename) {
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 100);
             }
             
             function fallbackExport(url, filename) {
