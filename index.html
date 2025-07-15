@@ -609,10 +609,6 @@
             const searchNextBtn = document.getElementById('search-next-btn');
             const searchInfo = document.getElementById('search-info');
             const processingMessage = document.getElementById('processing-message');
-            const exportModal = document.getElementById('export-modal');
-            const exportFilenameInput = document.getElementById('export-filename');
-            const cancelExportBtn = document.getElementById('cancel-export');
-            const confirmExportBtn = document.getElementById('confirm-export');
 
             let items = [];
             let originalItems = [];
@@ -635,15 +631,13 @@
             saveEditBtn.addEventListener('click', saveContent);
             cancelEditBtn.addEventListener('click', closeEditModal);
             importFileBtn.addEventListener('click', () => fileInput.click());
-            exportFileBtn.addEventListener('click', openExportModal);
             editContentBtn.addEventListener('click', openEditModal);
             shuffleBtn.addEventListener('click', shuffleItems);
             resetOrderBtn.addEventListener('click', resetOrder);
             increaseFontBtn.addEventListener('click', increaseFontSize);
             decreaseFontBtn.addEventListener('click', decreaseFontSize);
             fileInput.addEventListener('change', handleFileImport);
-            cancelExportBtn.addEventListener('click', closeExportModal);
-            confirmExportBtn.addEventListener('click', exportFile);
+            exportFileBtn.addEventListener('click', exportFile);
             
             searchInput.addEventListener('input', function() {
                 const hasText = this.value.trim().length > 0;
@@ -812,18 +806,6 @@
 
             function closeEditModal() {
                 editModal.classList.remove('active');
-                overlay.classList.remove('active');
-            }
-
-            function openExportModal() {
-                toggleMenu();
-                exportFilenameInput.value = isQAMode ? 'perguntas_respostas.txt' : 'documento.txt';
-                exportModal.classList.add('active');
-                overlay.classList.add('active');
-            }
-
-            function closeExportModal() {
-                exportModal.classList.remove('active');
                 overlay.classList.remove('active');
             }
 
