@@ -1275,13 +1275,35 @@
                     }
             
                     // 4. Detecção do formato (Q&A ou texto normal)
-                    const lineCount = fullText.split('\n').length;
-                    const questionCount = (fullText.match(/\?/g) || []).length;
+                    const lines = fullText.split('\n').filter(line => line.trim() !== '');
                     
-                    if (questionCount > 0 && questionCount/lineCount > 0.1) {
-                        parseQAContent(fullText);
+                    // Verifica se o texto parece ser perguntas e respostas (linhas alternadas)
+                    let isAlternatingLines = true;
+                    for (let i = 0; i < Math.min(lines.length, 10); i++) {
+                        const line = lines[i].trim();
+                        // Se alguma linha tiver múltiplas frases (mais de um ponto final), não é Q&A
+                        if ((line.match(/[.!?]/g) || []).length > 1) {
+                            isAlternatingLines = false;
+                            break;
+                        }
+                    }
+            
+                    if (isAlternatingLines && lines.length > 1) {
+                        // Verifica se o número de linhas é par para Q&A
+                        if (lines.length % 2 !== 0) {
+                            alert("Aviso: O número de linhas não é par. A última linha será ignorada.");
+                        }
+                        parseAlternatingLinesContent(fullText);
                     } else {
-                        parseTextContent(fullText);
+                        // Verifica se há separadores de Q&A (tabs ou ;;)
+                        const hasTabs = fullText.includes('\t');
+                        const hasDoubleSemicolon = fullText.includes(';;');
+                        
+                        if (hasTabs || hasDoubleSemicolon) {
+                            parseQAContent(fullText);
+                        } else {
+                            parseTextContent(fullText);
+                        }
                     }
             
                     updateDisplay(); // Atualiza a exibição imediatamente após a importação
