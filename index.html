@@ -870,7 +870,7 @@
                 updateFontSize(); 
             }
 
-             function parseQAContent(text) {
+            function parseQAContent(text) {
                 const lines = text.split('\n');
                 items = [];
                 originalItems = [];
@@ -904,6 +904,92 @@
                 originalItems = [...items];
                 currentIndex = 0;
                 isQAMode = items.length > 0 && items[0].hasOwnProperty('question');
+                saveState();
+            }
+
+            function parseAlternatingLinesContent(text) {
+                const lines = text.split('\n').filter(line => line.trim() !== '');
+                items = [];
+                originalItems = [];
+                
+                if (lines.length % 2 !== 0) {
+                    alert("Aviso: O número de linhas não é par. A última linha será ignorada.");
+                }
+                
+                for (let i = 0; i < lines.length - 1; i += 2) {
+                    const question = lines[i].trim();
+                    const answer = lines[i + 1].trim();
+                    items.push({ question, answer });
+                }
+                
+                originalItems = [...items];
+                currentIndex = 0;
+                isQAMode = true;
+                saveState();
+            }
+
+            function parseTextContent(text) {
+                // Primeiro, verifica se há linhas com múltiplas frases
+                const lines = text.split('\n');
+                let hasMultiSentenceLines = false;
+                
+                for (const line of lines) {
+                    const trimmedLine = line.trim();
+                    if (trimmedLine === '') continue;
+                    
+                    // Conta o número de frases (terminadas com .!? ou ...)
+                    const sentenceCount = (trimmedLine.match(/[.!?…]+/g) || []).length;
+                    
+                    // Se uma linha tiver mais de uma frase, não é formato Q&A
+                    if (sentenceCount > 1) {
+                        hasMultiSentenceLines = true;
+                        break;
+                    }
+                }
+                
+                // Se não houver linhas com múltiplas frases e o número de linhas for par, pode ser Q&A
+                if (!hasMultiSentenceLines && lines.length > 1 && lines.length % 2 === 0) {
+                    parseAlternatingLinesContent(text);
+                    return;
+                }
+                
+                // Caso contrário, processa como texto normal
+                let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
+                cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
+                
+                const sentenceRegex = /[^.!?]+[.!?…]+/g;
+                let sentences = cleanedText.match(sentenceRegex) || [];
+                sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
+                
+                let processedItems = [];
+                let currentChunk = '';
+                
+                for (let i = 0; i < sentences.length; i++) {
+                    const sentence = sentences[i];
+                    
+                    if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
+                        currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
+                        continue;
+                    }
+                    
+                    if (currentChunk || sentence.length >= 75) {
+                        processedItems.push({
+                            text: currentChunk ? currentChunk + ' ' + sentence : sentence
+                        });
+                        currentChunk = '';
+                    } 
+                    else if (i === sentences.length - 1 && processedItems.length > 0) {
+                        processedItems[processedItems.length - 1].text += ' ' + sentence;
+                    }
+                    else {
+                        processedItems.push({ text: sentence });
+                    }
+                }
+                
+                items = processedItems;
+                originalItems = [...items];
+                currentIndex = 0;
+                isQAMode = false;
                 saveState();
             }
 
