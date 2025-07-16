@@ -939,8 +939,10 @@ function parseTextContent(text) {
     let hasMultiSentenceLines = false;
     for (const line of lines) {
         const trimmedLine = line.trim();
-        const sentenceDelimiters = trimmedLine.split(/[.!?…]+/).filter(s => s.trim() !== '');
-        if (sentenceDelimiters.length > 1) {
+        // Contar o número de frases na linha (terminadas com .!?…)
+        const sentenceCount = (trimmedLine.match(/[.!?…]+/g) || []).length;
+        // Se houver mais pontuações finais do que no final da linha, é múltiplas frases
+        if (sentenceCount > 1 && !(sentenceCount === 1 && trimmedLine.match(/[.!?…]+$/))) {
             hasMultiSentenceLines = true;
             break;
         }
@@ -968,11 +970,22 @@ function parseTextContent(text) {
     }
     
     // Se chegou aqui, trata como texto normal
-    let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
-    cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
+    // Primeiro juntamos todas as linhas preservando quebras onde há múltiplas frases
+    let combinedText = '';
+    for (const line of lines) {
+        const trimmedLine = line.trim();
+        // Se a linha termina com pontuação, é uma frase completa
+        if (trimmedLine.match(/[.!?…]$/)) {
+            combinedText += trimmedLine + ' ';
+        } else {
+            // Se não termina com pontuação, junta com espaço
+            combinedText += trimmedLine + ' ';
+        }
+    }
     
-    const sentenceRegex = /[^.!?]+[.!?…]+/g;
-    let sentences = cleanedText.match(sentenceRegex) || [];
+    // Agora dividimos em frases
+    const sentenceRegex = /[^.!?…]*[.!?…]+/g;
+    let sentences = combinedText.match(sentenceRegex) || [];
     sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
     
     let processedItems = [];
@@ -981,22 +994,32 @@ function parseTextContent(text) {
     for (let i = 0; i < sentences.length; i++) {
         const sentence = sentences[i];
         
+        // Se o chunk atual + nova frase tiver menos de 75 caracteres E não for a última frase
         if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
             currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
-            continue;
+        } else {
+            // Se for a última frase ou atingir o tamanho mínimo
+            if (currentChunk) {
+                processedItems.push({
+                    text: currentChunk + ' ' + sentence
+                });
+                currentChunk = '';
+            } else {
+                processedItems.push({
+                    text: sentence
+                });
+            }
         }
-        
-        if (currentChunk || sentence.length >= 75) {
-            processedItems.push({
-                text: currentChunk ? currentChunk + ' ' + sentence : sentence
-            });
-            currentChunk = '';
-        } 
-        else if (i === sentences.length - 1 && processedItems.length > 0) {
-            processedItems[processedItems.length - 1].text += ' ' + sentence;
-        }
-        else {
-            processedItems.push({ text: sentence });
+    }
+    
+    // Garantir que nenhum conteúdo seja perdido
+    if (currentChunk) {
+        if (processedItems.length > 0) {
+            // Adiciona ao último item se já houver itens
+            processedItems[processedItems.length - 1].text += ' ' + currentChunk;
+        } else {
+            // Cria um novo item se não houver nenhum
+            processedItems.push({ text: currentChunk });
         }
     }
     
