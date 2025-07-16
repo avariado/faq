@@ -838,19 +838,27 @@
 
             function checkAlternatingLinesFormat(text) {
                 const lines = text.split('\n').filter(line => line.trim() !== '');
-                if (lines.length < 2) return false;
                 
+                // Verifica se alguma linha contém múltiplas frases terminadas com .!? ou ...
                 for (const line of lines) {
-                    const trimmedLine = line.trim();
-                    if (trimmedLine.split('.').length > 2 && !trimmedLine.endsWith('.')) {
-                        return false;
-                    }
-                    if ((trimmedLine.match(/[.!?]/g) || []).length > 1) {
-                        return false;
+                    // Conta o número de frases na linha (terminadas com .!? ou ...)
+                    const sentenceCount = (line.split(/[.!?…]+/g).length - 1);
+                    if (sentenceCount > 1) {
+                        return false; // Não é formato Q&A se tiver múltiplas frases numa linha
                     }
                 }
                 
-                return true;
+                // Verifica se há separadores de Q&A (tabs ou ;;)
+                const hasTabs = text.includes('\t');
+                const hasDoubleSemicolon = text.includes(';;');
+                
+                // Se tiver separadores, é Q&A independentemente do número de linhas
+                if (hasTabs || hasDoubleSemicolon) {
+                    return true;
+                }
+                
+                // Se não tiver separadores, só é Q&A se tiver número par de linhas
+                return lines.length % 2 === 0;
             }
 
             function loadSampleData() {
@@ -929,35 +937,41 @@
             }
 
             function parseTextContent(text) {
-                let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
-                cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
-                
-                const sentenceRegex = /[^.!?]+[.!?…]+/g;
-                let sentences = cleanedText.match(sentenceRegex) || [];
-                sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
+                // Primeiro, preservar todas as quebras de linha originais
+                const paragraphs = text.split(/\n\s*\n/); // Divide por parágrafos vazios
                 
                 let processedItems = [];
-                let currentChunk = '';
                 
-                for (let i = 0; i < sentences.length; i++) {
-                    const sentence = sentences[i];
+                for (const paragraph of paragraphs) {
+                    // Substituir quebras de linha simples por espaços dentro do mesmo parágrafo
+                    let cleanedParagraph = paragraph.replace(/(\r\n|\n|\r)/g, ' ').replace(/\s+/g, ' ').trim();
                     
-                    if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
-                        currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
-                        continue;
+                    if (!cleanedParagraph) continue;
+                    
+                    // Dividir em frases, mantendo os delimitadores
+                    const sentenceRegex = /[^.!?]*[.!?…]+/g;
+                    let sentences = cleanedParagraph.match(sentenceRegex) || [];
+                    sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
+                    
+                    let currentChunk = '';
+                    
+                    for (let i = 0; i < sentences.length; i++) {
+                        const sentence = sentences[i];
+                        
+                        // Se o chunk atual + nova frase tiver menos de 75 caracteres e não for a última frase
+                        if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
+                            currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
+                        } else {
+                            // Adiciona o chunk atual + frase atual
+                            const finalText = currentChunk ? currentChunk + ' ' + sentence : sentence;
+                            processedItems.push({ text: finalText });
+                            currentChunk = '';
+                        }
                     }
                     
-                    if (currentChunk || sentence.length >= 75) {
-                        processedItems.push({
-                            text: currentChunk ? currentChunk + ' ' + sentence : sentence
-                        });
-                        currentChunk = '';
-                    } 
-                    else if (i === sentences.length - 1 && processedItems.length > 0) {
-                        processedItems[processedItems.length - 1].text += ' ' + sentence;
-                    }
-                    else {
-                        processedItems.push({ text: sentence });
+                    // Adiciona qualquer chunk remanescente
+                    if (currentChunk) {
+                        processedItems.push({ text: currentChunk });
                     }
                 }
                 
@@ -1247,33 +1261,31 @@
                     // 4. Detecção do formato (Q&A ou texto normal)
                     const lines = fullText.split('\n').filter(line => line.trim() !== '');
                     
-                    // Verifica se o texto parece ser perguntas e respostas (linhas alternadas)
+                    // Verificação se é formato Q&A
                     let isAlternatingLines = true;
                     for (let i = 0; i < Math.min(lines.length, 10); i++) {
                         const line = lines[i].trim();
-                        // Se alguma linha tiver múltiplas frases (mais de um ponto final), não é Q&A
-                        if ((line.match(/[.!?]/g) || []).length > 1) {
+                        // Se alguma linha tiver múltiplas frases (terminadas com .!? ou ...), não é Q&A
+                        const sentenceCount = (line.split(/[.!?…]+/g).length - 1);
+                        if (sentenceCount > 1) {
                             isAlternatingLines = false;
                             break;
                         }
                     }
             
-                    if (isAlternatingLines && lines.length > 1) {
-                        // Verifica se o número de linhas é par para Q&A
-                        if (lines.length % 2 !== 0) {
-                            alert("Aviso: O número de linhas não é par. A última linha será ignorada.");
-                        }
+                    // Verifica se há separadores de Q&A (tabs ou ;;)
+                    const hasTabs = fullText.includes('\t');
+                    const hasDoubleSemicolon = fullText.includes(';;');
+            
+                    if (hasTabs || hasDoubleSemicolon) {
+                        // Se tiver separadores, trata como Q&A independentemente do número de linhas
+                        parseQAContent(fullText);
+                    } else if (isAlternatingLines && lines.length > 1 && lines.length % 2 === 0) {
+                        // Só trata como Q&A alternado se não tiver múltiplas frases por linha E número par de linhas
                         parseAlternatingLinesContent(fullText);
                     } else {
-                        // Verifica se há separadores de Q&A (tabs ou ;;)
-                        const hasTabs = fullText.includes('\t');
-                        const hasDoubleSemicolon = fullText.includes(';;');
-                        
-                        if (hasTabs || hasDoubleSemicolon) {
-                            parseQAContent(fullText);
-                        } else {
-                            parseTextContent(fullText);
-                        }
+                        // Caso contrário, trata como texto normal
+                        parseTextContent(fullText);
                     }
             
                     updateDisplay(); // Atualiza a exibição imediatamente após a importação
