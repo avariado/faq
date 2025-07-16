@@ -936,7 +936,7 @@
             }
 
             function parseTextContent(text) {
-                // Primeiro, normaliza as quebras de linha mantendo os parágrafos
+                // Normaliza as quebras de linha mantendo os parágrafos
                 let normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
                 
                 // Divide o texto em parágrafos (separados por uma ou mais quebras de linha)
@@ -962,10 +962,30 @@
                         paragraphSentences.push(paragraph.trim());
                     }
                     
-                    sentences = sentences.concat(paragraphSentences);
+                    // Agrupa frases curtas (menos de 75 caracteres) com a próxima frase
+                    let groupedSentences = [];
+                    let currentChunk = '';
+                    
+                    for (const sentence of paragraphSentences) {
+                        if (currentChunk.length === 0) {
+                            currentChunk = sentence;
+                        } else if (currentChunk.length < 75) {
+                            currentChunk += ' ' + sentence;
+                        } else {
+                            groupedSentences.push(currentChunk);
+                            currentChunk = sentence;
+                        }
+                    }
+                    
+                    // Adiciona o último chunk, mesmo se for curto
+                    if (currentChunk.length > 0) {
+                        groupedSentences.push(currentChunk);
+                    }
+                    
+                    sentences = sentences.concat(groupedSentences);
                 }
                 
-                // Cria os itens - cada frase é um item, mesmo que curta
+                // Cria os itens - garantindo que nenhuma frase seja omitida
                 items = sentences.map(text => ({ text }));
                 originalItems = [...items];
                 currentIndex = 0;
