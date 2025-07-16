@@ -929,32 +929,41 @@
             }
 
             function parseTextContent(text) {
-                // 1. Primeiro verifica se é QA com delimitadores (tab ou ::)
+                // 1. Verifica se é QA com delimitadores (tab ou ::)
                 if (text.includes('\t') || text.includes('::')) {
                     processAsQAWithDelimiters(text);
                     return;
                 }
             
-                // 2. Verifica se é texto normal (qualquer linha com múltiplas frases)
-                const lines = text.split(/\r\n|\n|\r/).filter(line => line.trim().length > 0);
-                
-                for (const line of lines) {
-                    // Divide a linha em frases usando pontuação final
-                    const sentences = line.split(/(?<=[.!?…])\s+/);
-                    
-                    if (sentences.length > 1) {
-                        // Se qualquer linha tiver mais de uma frase, processa como texto normal
-                        processAsNormalText(text);
-                        return;
-                    }
+                // 2. Verifica se é texto normal (linhas com múltiplas frases)
+                if (isNormalText(text)) {
+                    processAsNormalText(text);
+                    return;
                 }
             
-                // 3. Se chegou aqui, é QA de uma frase por linha
+                // 3. Se não for nenhum dos acima, trata como QA de uma frase por linha
+                const lines = text.split(/\r\n|\n|\r/).filter(line => line.trim().length > 0);
                 items = lines.map(line => ({ text: line.trim() }));
                 originalItems = [...items];
                 currentIndex = 0;
                 isQAMode = false;
                 saveState();
+            }
+            
+            function isNormalText(text) {
+                const lines = text.split(/\r\n|\n|\r/);
+                for (const line of lines) {
+                    if (line.trim().length === 0) continue;
+                    
+                    // Conta quantas frases completas existem na linha
+                    const sentenceCount = line.split(/[.!?…]\s+/).length;
+                    
+                    // Se tiver mais de uma frase completa, é texto normal
+                    if (sentenceCount > 1) {
+                        return true;
+                    }
+                }
+                return false;
             }
             
             function processAsQAWithDelimiters(text) {
@@ -977,12 +986,12 @@
                 let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?…])/g, ' ');
                 cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
                 
-                // Divide em frases preservando a pontuação final
+                // Divide em frases
                 const sentenceRegex = /[^.!?…]+[.!?…]+/g;
                 let sentences = cleanedText.match(sentenceRegex) || [];
                 sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
                 
-                // Combina frases curtas (<75 caracteres)
+                // Processa as frases
                 let processedItems = [];
                 let currentChunk = '';
                 
@@ -1005,7 +1014,6 @@
                 isQAMode = false;
                 saveState();
             }
-
             function updateDisplay() {
                 if (items.length === 0) {
                     questionEl.textContent = "Nenhum conteúdo carregado.";
