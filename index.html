@@ -907,58 +907,49 @@ function checkAlternatingLinesFormat(text) {
             }
 
 function parseTextContent(text) {
-    // 1. Normalização do texto - preservar quebras de linha significativas
+    // 1. Normalizar quebras de linha
     let normalizedText = text.replace(/(\r\n|\n|\r)/g, '\n').replace(/^\s+|\s+$/g, '');
     
-    // 2. Verificação rigorosa de múltiplas frases por linha
-    const lines = normalizedText.split('\n');
-    let hasMultiSentenceLines = lines.some(line => {
-        const trimmed = line.trim();
-        return (trimmed.match(/[.!?…]/g) || []).length > 1;
-    });
+    // 2. Dividir em linhas e remover linhas vazias
+    const lines = normalizedText.split('\n').filter(line => line.trim() !== '');
     
-    // 3. Verificação de delimitadores Q&A
-    const hasQADelimiters = text.includes('\t') || text.includes(';;');
+    // 3. Juntar linhas em um único parágrafo
+    let fullText = lines.join(' ').replace(/\s+/g, ' ').trim();
     
-    // 4. Processamento como texto normal (não Q&A)
-    if (!hasQADelimiters || hasMultiSentenceLines) {
-        // Unir linhas mantendo a estrutura de frases
-        let content = lines.join(' ').replace(/\s+/g, ' ').trim();
+    // 4. Dividir em frases usando pontuação
+    const sentenceRegex = /[^.!?…]*[.!?…]+/g;
+    let sentences = fullText.match(sentenceRegex) || [fullText];
+    sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
+    
+    // 5. Agrupar frases em cartões com aproximadamente 3 frases cada
+    let processedItems = [];
+    let currentChunk = [];
+    let charCount = 0;
+    
+    for (const sentence of sentences) {
+        currentChunk.push(sentence);
+        charCount += sentence.length;
         
-        // Divisão inteligente em frases
-        const sentenceRegex = /[^.!?…]*[.!?…]+/g;
-        let sentences = content.match(sentenceRegex) || [content];
-        sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
-        
-        // Agrupamento otimizado mantendo o mínimo de 75 caracteres
-        let processedItems = [];
-        let currentChunk = '';
-        
-        for (const sentence of sentences) {
-            const potentialChunk = currentChunk 
-                ? `${currentChunk} ${sentence}` 
-                : sentence;
-            
-            if (potentialChunk.length >= 75 || sentences.length === 1) {
-                if (currentChunk) processedItems.push({ text: currentChunk });
-                currentChunk = sentence;
-            } else {
-                currentChunk = potentialChunk;
-            }
+        // Se tiver 3 frases ou mais de 100 caracteres, cria um novo cartão
+        if (currentChunk.length >= 3 || charCount >= 100 || sentence === sentences[sentences.length-1]) {
+            processedItems.push({ 
+                text: currentChunk.join(' ') 
+            });
+            currentChunk = [];
+            charCount = 0;
         }
-        
-        // Adicionar o último chunk se existir
-        if (currentChunk) processedItems.push({ text: currentChunk });
-        
-        // Caso especial para textos muito curtos
-        if (processedItems.length === 0 && content) processedItems.push({ text: content });
-        
-        // Atribui diretamente às variáveis do escopo principal
-        items = processedItems;
-        isQAMode = false;
-    } else if (hasQADelimiters) {
-        parseQAContent(text);
     }
+    
+    // Adicionar qualquer chunk restante
+    if (currentChunk.length > 0) {
+        processedItems.push({ 
+            text: currentChunk.join(' ') 
+        });
+    }
+    
+    // Atribui diretamente às variáveis do escopo principal
+    items = processedItems;
+    isQAMode = false;
     
     originalItems = [...items];
     currentIndex = 0;
