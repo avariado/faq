@@ -948,54 +948,61 @@ function parseTextContent(text) {
     const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
 
     // 2. Verifica se é um arquivo Q&A (se alguma linha tiver múltiplas frases)
-    const hasMultiSentenceLines = lines.some(line => {
-        const trimmedLine = line.trim();
-        // Conta quantos terminadores de frase existem na linha
-        const sentenceEndings = (trimmedLine.match(/[.!?…]+/g) || []).length;
-        // Se tiver mais de 1 terminador e não for apenas no final, é múltiplas frases
-        return sentenceEndings > 1 && !(/^[^.!?]*[.!?…]+$/.test(trimmedLine));
-    });
-
-    // Se for detectado como Q&A, mas tem linhas com múltiplas frases, força modo texto
-    if (hasMultiSentenceLines) {
-        isQAMode = false;
-    }
-
-    // 3. Processa como texto normal
-    const sentences = [];
-    
-    // Primeiro extrai todas as frases de todas as linhas
+    let isPotentialQA = true;
     for (const line of lines) {
         const trimmedLine = line.trim();
-        // Divide em frases usando os terminadores
-        const lineSentences = trimmedLine.split(/(?<=[.!?…])\s+/).filter(s => s.length > 0);
-        sentences.push(...lineSentences);
-    }
-
-    // 4. Agrupa frases até atingir 75+ caracteres
-    const processedItems = [];
-    let currentChunk = [];
-    let currentLength = 0;
-
-    for (const sentence of sentences) {
-        currentChunk.push(sentence);
-        currentLength += sentence.length;
-
-        // Se atingir 75+ caracteres OU for a última frase
-        if (currentLength >= 75 || sentence === sentences[sentences.length - 1]) {
-            if (currentChunk.length > 0) {
-                processedItems.push({
-                    text: currentChunk.join(' ')
-                });
-                currentChunk = [];
-                currentLength = 0;
-            }
+        // Verifica se a linha contém múltiplas frases terminadas com .!?…
+        const sentenceCount = (trimmedLine.split(/[.!?…]+/).length - 1;
+        if (sentenceCount > 1) {
+            isPotentialQA = false;
+            break;
         }
     }
 
-    // Configurações finais
-    items = processedItems;
-    isQAMode = false;
+    // 3. Se for potencial Q&A mas tem número ímpar de linhas, força modo texto
+    if (isPotentialQA && lines.length % 2 !== 0) {
+        isPotentialQA = false;
+    }
+
+    // 4. Se não for Q&A, processa como texto normal
+    if (!isPotentialQA) {
+        // Agrupa linhas até atingir 75+ caracteres
+        const processedItems = [];
+        let currentChunk = [];
+        let currentLength = 0;
+
+        for (const line of lines) {
+            const trimmedLine = line.trim();
+            currentChunk.push(trimmedLine);
+            currentLength += trimmedLine.length;
+
+            // Se atingir 75+ caracteres OU for a última linha
+            if (currentLength >= 75 || line === lines[lines.length - 1]) {
+                if (currentChunk.length > 0) {
+                    processedItems.push({
+                        text: currentChunk.join(' ')
+                    });
+                    currentChunk = [];
+                    currentLength = 0;
+                }
+            }
+        }
+
+        // Configurações finais para modo texto
+        items = processedItems;
+        isQAMode = false;
+    } else {
+        // Processa como Q&A (linhas alternadas)
+        items = [];
+        for (let i = 0; i < lines.length - 1; i += 2) {
+            items.push({
+                question: lines[i].trim(),
+                answer: lines[i+1].trim()
+            });
+        }
+        isQAMode = true;
+    }
+
     originalItems = [...items];
     currentIndex = 0;
     saveState();
