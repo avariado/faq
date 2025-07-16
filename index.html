@@ -929,21 +929,12 @@
             }
 
             function parseTextContent(text) {
-                // Substitui quebras de linha no meio de frases por espaços
-                let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?…])/g, ' ');
+                let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
                 cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
                 
-                // Regex melhorada para capturar frases, incluindo a última mesmo sem pontuação
-                const sentenceRegex = /[^.!?…]*[^.!?…\s](?:[.!?…]+|$)/g;
-                let sentences = [];
-                let match;
-                
-                // Usando exec para capturar todas as ocorrências, incluindo a última
-                while ((match = sentenceRegex.exec(cleanedText)) !== null) {
-                    if (match[0].trim()) {
-                        sentences.push(match[0].trim());
-                    }
-                }
+                const sentenceRegex = /[^.!?]+[.!?…]+/g;
+                let sentences = cleanedText.match(sentenceRegex) || [];
+                sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
                 
                 let processedItems = [];
                 let currentChunk = '';
@@ -953,24 +944,20 @@
                     
                     if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
                         currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
-                    } else {
-                        if (currentChunk) {
-                            processedItems.push({
-                                text: currentChunk + (sentence ? ' ' + sentence : '')
-                            });
-                            currentChunk = '';
-                        } else {
-                            processedItems.push({ text: sentence });
-                        }
+                        continue;
                     }
-                }
-                
-                // Garante que o último chunk não foi perdido
-                if (currentChunk) {
-                    if (processedItems.length > 0) {
-                        processedItems[processedItems.length - 1].text += ' ' + currentChunk;
-                    } else {
-                        processedItems.push({ text: currentChunk });
+                    
+                    if (currentChunk || sentence.length >= 75) {
+                        processedItems.push({
+                            text: currentChunk ? currentChunk + ' ' + sentence : sentence
+                        });
+                        currentChunk = '';
+                    } 
+                    else if (i === sentences.length - 1 && processedItems.length > 0) {
+                        processedItems[processedItems.length - 1].text += ' ' + sentence;
+                    }
+                    else {
+                        processedItems.push({ text: sentence });
                     }
                 }
                 
@@ -979,37 +966,6 @@
                 currentIndex = 0;
                 isQAMode = false;
                 saveState();
-            }
-
-            function checkIfSingleSentence(line) {
-                if (!line.trim()) return false;
-                
-                // Conta quantos terminadores de frase existem
-                const punctuationCount = (line.match(/[.!?…]/g) || []).length;
-                
-                // Considera como frase única se:
-                // 1. Não tem nenhum terminador OU
-                // 2. Tem apenas um terminador no final
-                return punctuationCount === 0 || 
-                      (punctuationCount === 1 && /[.!?…]\s*$/.test(line));
-            }
-
-            function processTextContent(text) {
-                const lines = text.split('\n').filter(line => line.trim() !== '');
-                
-                // Verifica se todas as linhas são frases únicas (sem múltiplos terminadores)
-                const allSingleSentences = lines.every(line => checkIfSingleSentence(line));
-                
-                if (allSingleSentences && lines.length >= 2) {
-                    // Formato de linhas alternadas (pergunta/resposta)
-                    parseAlternatingLinesContent(text);
-                } else if (text.includes('\t') || text.includes(';;')) {
-                    // Formato com delimitadores
-                    parseQAContent(text);
-                } else {
-                    // Texto normal
-                    parseTextContent(text);
-                }
             }
 
             function updateDisplay() {
