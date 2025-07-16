@@ -907,39 +907,35 @@ function checkAlternatingLinesFormat(text) {
             }
 
 function parseTextContent(text) {
-    // 1. Normaliza o texto preservando a estrutura de frases
+    // 1. Normaliza o texto (remove espaços extras e quebras de linha)
     const normalizedText = text
-        .replace(/(\r\n|\n|\r)/g, ' ')  // Converte quebras de linha em espaços
-        .replace(/\s+/g, ' ')           // Remove espaços múltiplos
-        .trim();
+        .replace(/(\r\n|\n|\r)/g, ' ')  // Substitui quebras de linha por espaços
+        .replace(/\s+/g, ' ')            // Remove múltiplos espaços
+        .trim();                         // Remove espaços no início/fim
 
-    // 2. Divide em frases completas (usando pontuação como delimitador)
-    const sentenceRegex = /[^.!?…]*[.!?…]+/g;
-    let sentences = normalizedText.match(sentenceRegex) || [normalizedText];
-    sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
-
-    // 3. Agrupa frases até atingir pelo menos 75 caracteres
-    let processedItems = [];
+    // 2. Divide em frases COMPLETAS (usando pontuação como delimitador)
+    const sentenceRegex = /[^.!?…]*[.!?…]\s*/g;
+    const sentences = normalizedText.match(sentenceRegex) || [normalizedText];
+    
+    // 3. Agrupa frases até atingir PELO MENOS 75 caracteres
+    const processedItems = [];
     let currentChunk = [];
     let currentLength = 0;
 
     for (const sentence of sentences) {
-        currentChunk.push(sentence);
+        currentChunk.push(sentence.trim());
         currentLength += sentence.length;
 
-        // Cria cartão quando atinge o mínimo ou é a última frase
-        if (currentLength >= 75 || sentence === sentences[sentences.length-1]) {
-            processedItems.push({ 
-                text: currentChunk.join(' ') 
-            });
-            currentChunk = [];
-            currentLength = 0;
+        // Se atingir 75+ caracteres OU for a última frase, cria um cartão
+        if (currentLength >= 75 || sentence === sentences[sentences.length - 1]) {
+            if (currentChunk.length > 0) {
+                processedItems.push({
+                    text: currentChunk.join(' ')
+                });
+                currentChunk = [];
+                currentLength = 0;
+            }
         }
-    }
-
-    // Caso especial para textos muito curtos
-    if (processedItems.length === 0 && normalizedText) {
-        processedItems.push({ text: normalizedText });
     }
 
     // Atualiza os dados
