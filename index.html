@@ -930,63 +930,67 @@ function checkAlternatingLinesFormat(text) {
             }
 
 function parseTextContent(text) {
-    // 1. Normaliza quebras de linha e espaços
+    // 1. Normaliza espaços e quebras de linha
     let normalizedText = text.replace(/(\r\n|\n|\r)/g, ' ').replace(/\s+/g, ' ').trim();
     
-    // 2. Divide em frases usando pontuação como delimitador
-    const sentenceRegex = /[^.!?…]*[.!?…]+/g;
+    // 2. Divide em frases COMPLETAS (incluindo a pontuação)
+    const sentenceRegex = /([^.!?…]+[.!?…]+)\s*/g;
     let sentences = [];
     let match;
+    
     while ((match = sentenceRegex.exec(normalizedText)) !== null) {
-        const sentence = match[0].trim();
-        if (sentence.length > 0) {
-            sentences.push(sentence);
-        }
+        sentences.push(match[1].trim());
     }
     
-    // 3. Agrupa frases em cartões com mínimo de 75 caracteres
-    let processedItems = [];
+    // 3. Se não encontrou frases (texto sem pontuação), trata como uma única frase
+    if (sentences.length === 0) {
+        items = [{ text: normalizedText }];
+        originalItems = [...items];
+        isQAMode = false;
+        saveState();
+        return;
+    }
+    
+    // 4. Agrupa frases em cartões inteligentes
+    let cards = [];
     let currentCard = '';
     
-    for (const sentence of sentences) {
-        // Se a frase sozinha já tem mais de 75 chars, adiciona como cartão único
-        if (sentence.length >= 75) {
-            if (currentCard) {
-                processedItems.push({ text: currentCard });
-                currentCard = '';
-            }
-            processedItems.push({ text: sentence });
-            continue;
-        }
+    for (let i = 0; i < sentences.length; i++) {
+        const sentence = sentences[i];
         
-        // Verifica se adicionando ao cartão atual ultrapassa 75 chars
-        const potentialCard = currentCard ? `${currentCard} ${sentence}` : sentence;
-        
-        if (potentialCard.length >= 75) {
-            processedItems.push({ text: potentialCard });
-            currentCard = '';
+        if (currentCard.length === 0) {
+            currentCard = sentence;
         } else {
-            currentCard = potentialCard;
+            const potentialCard = currentCard + ' ' + sentence;
+            
+            // Se já temos 75+ chars OU é a última frase
+            if (potentialCard.length >= 75 || i === sentences.length - 1) {
+                cards.push(potentialCard);
+                currentCard = '';
+            } else {
+                currentCard = potentialCard;
+            }
         }
     }
     
-    // Adiciona o último cartão se houver conteúdo restante
-    if (currentCard) {
-        processedItems.push({ text: currentCard });
+    // 5. Adiciona o último cartão se sobrou algo
+    if (currentCard.length > 0) {
+        cards.push(currentCard);
     }
     
-    // 4. Se nenhum cartão atingiu 75 chars, junta tudo em um
-    if (processedItems.length === 0 && sentences.length > 0) {
-        processedItems.push({ text: sentences.join(' ') });
+    // 6. Se todos os cartões ficaram pequenos, junta tudo
+    if (cards.length > 1 && cards.every(card => card.length < 75)) {
+        cards = [cards.join(' ')];
     }
     
-    items = processedItems;
+    // 7. Prepara os itens finais
+    items = cards.map(text => ({ text }));
     originalItems = [...items];
     currentIndex = 0;
     isQAMode = false;
     saveState();
 }
-
+            
             function updateDisplay() {
                 if (items.length === 0) {
                     questionEl.textContent = "Nenhum conteúdo carregado.";
