@@ -907,20 +907,43 @@ function checkAlternatingLinesFormat(text) {
             }
 
 function parseTextContent(text) {
-    // 1. Normaliza o texto (remove espaços extras e preserva estrutura)
+    // 1. Normaliza o texto preservando a estrutura de frases
     const normalizedText = text
-        .replace(/(\r\n|\n|\r)/g, '\n')  // Mantém quebras de linha únicas
-        .replace(/^\s+|\s+$/g, '');       // Remove espaços no início/fim
+        .replace(/(\r\n|\n|\r)/g, ' ')  // Converte quebras de linha em espaços
+        .replace(/\s+/g, ' ')           // Remove espaços múltiplos
+        .trim();
 
-    // 2. Divide em parágrafos (separados por uma ou mais quebras de linha)
-    const paragraphs = normalizedText.split(/\n+/).filter(p => p.trim().length > 0);
+    // 2. Divide em frases completas (usando pontuação como delimitador)
+    const sentenceRegex = /[^.!?…]*[.!?…]+/g;
+    let sentences = normalizedText.match(sentenceRegex) || [normalizedText];
+    sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
 
-    // 3. Processa cada parágrafo individualmente
-    items = paragraphs.map(paragraph => ({
-        text: paragraph.replace(/\s+/g, ' ').trim()
-    }));
+    // 3. Agrupa frases até atingir pelo menos 75 caracteres
+    let processedItems = [];
+    let currentChunk = [];
+    let currentLength = 0;
 
-    // Configurações finais
+    for (const sentence of sentences) {
+        currentChunk.push(sentence);
+        currentLength += sentence.length;
+
+        // Cria cartão quando atinge o mínimo ou é a última frase
+        if (currentLength >= 75 || sentence === sentences[sentences.length-1]) {
+            processedItems.push({ 
+                text: currentChunk.join(' ') 
+            });
+            currentChunk = [];
+            currentLength = 0;
+        }
+    }
+
+    // Caso especial para textos muito curtos
+    if (processedItems.length === 0 && normalizedText) {
+        processedItems.push({ text: normalizedText });
+    }
+
+    // Atualiza os dados
+    items = processedItems;
     isQAMode = false;
     originalItems = [...items];
     currentIndex = 0;
