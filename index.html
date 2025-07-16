@@ -1209,33 +1209,34 @@ async function processPDFFile(file) {
             fullText += textContent.items.map(item => item.str).join(' ') + '\n';
         }
 
-        // 2. Análise estrita conforme suas instruções
+        // 2. Verificação estrita conforme suas instruções
         const lines = fullText.split('\n').filter(line => line.trim() !== '');
-        let isStrictQnA = false;
-
-        // Verificação 1: Tem delimitadores tab ou ;;
-        const hasDelimiters = fullText.includes('\t') || fullText.includes(';;');
         
-        // Verificação 2: Nenhuma linha tem múltiplas frases
+        // Critério 1: Verifica se é Q&A com delimitadores
+        const hasQnADelimiters = fullText.includes('\t') || fullText.includes(';;');
+        
+        // Critério 2: Verifica se há linhas com múltiplas frases
         let hasMultiSentenceLines = false;
+        const sentenceRegex = /[^.!?…]*[.!?…]+/g;
+        
         for (const line of lines) {
-            const sentenceEndings = (line.match(/[.!?…]/g) || []).length;
-            if (sentenceEndings > 1) {
+            const sentences = line.match(sentenceRegex) || [];
+            if (sentences.length > 1) {
                 hasMultiSentenceLines = true;
                 break;
             }
         }
 
-        // Regra definitiva (conforme suas instruções):
-        isStrictQnA = hasDelimiters || (!hasMultiSentenceLines && lines.length % 2 === 0);
-
-        // 3. Processamento conforme análise
-        if (isStrictQnA && hasDelimiters) {
+        // 3. Decisão final conforme suas regras
+        if (hasQnADelimiters) {
+            // Modo Q&A forçado quando há delimitadores
             parseQAContent(fullText);
-        } else if (isStrictQnA) {
+        } else if (!hasMultiSentenceLines && lines.length % 2 === 0) {
+            // Modo Q&A apenas se não houver linhas múltiplas E número par de linhas
             parseAlternatingLinesContent(fullText);
         } else {
-            parseTextContent(fullText); // Sempre que houver linhas com múltiplas frases
+            // Qualquer outro caso é texto normal
+            parseTextContent(fullText);
         }
 
     } catch (error) {
