@@ -840,17 +840,23 @@
                 const lines = text.split('\n').filter(line => line.trim() !== '');
                 if (lines.length < 2) return false;
                 
+                // Verifica se alguma linha tem múltiplas frases (mais de um ponto final, exclamação, interrogação ou três pontos)
                 for (const line of lines) {
                     const trimmedLine = line.trim();
-                    if (trimmedLine.split('.').length > 2 && !trimmedLine.endsWith('.')) {
-                        return false;
-                    }
-                    if ((trimmedLine.match(/[.!?]/g) || []).length > 1) {
-                        return false;
+                    // Conta o número de frases na linha
+                    const sentenceCount = (trimmedLine.match(/[.!?…]+/g) || []).length;
+                    
+                    // Se a linha terminar com pontuação, não conta como frase extra
+                    const endsWithPunctuation = /[.!?…]+$/.test(trimmedLine);
+                    const actualSentenceCount = endsWithPunctuation ? sentenceCount : sentenceCount + 1;
+                    
+                    if (actualSentenceCount > 1) {
+                        return false; // Encontrou linha com múltiplas frases
                     }
                 }
                 
-                return true;
+                // Além disso, verifica se o número de linhas é par para ser Q&A
+                return lines.length % 2 === 0;
             }
 
             function loadSampleData() {
@@ -912,14 +918,15 @@
                 items = [];
                 originalItems = [];
                 
-                if (lines.length % 2 !== 0) {
-                    alert("Aviso: O número de linhas não é par. A última linha será ignorada.");
-                }
-                
                 for (let i = 0; i < lines.length - 1; i += 2) {
                     const question = lines[i].trim();
                     const answer = lines[i + 1].trim();
                     items.push({ question, answer });
+                }
+                
+                // Se o número de linhas for ímpar, adiciona a última linha como uma pergunta sem resposta
+                if (lines.length % 2 !== 0) {
+                    items.push({ question: lines[lines.length - 1].trim(), answer: '' });
                 }
                 
                 originalItems = [...items];
@@ -929,39 +936,26 @@
             }
 
             function parseTextContent(text) {
-                let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
-                cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
+                // Primeiro, normaliza as quebras de linha
+                let cleanedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
                 
-                const sentenceRegex = /[^.!?]+[.!?…]+/g;
-                let sentences = cleanedText.match(sentenceRegex) || [];
-                sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
+                // Divide em frases usando pontuação como delimitador
+                const sentenceRegex = /[^.!?…]+[.!?…]+/g;
+                let sentences = [];
+                let match;
                 
-                let processedItems = [];
-                let currentChunk = '';
-                
-                for (let i = 0; i < sentences.length; i++) {
-                    const sentence = sentences[i];
-                    
-                    if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
-                        currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
-                        continue;
-                    }
-                    
-                    if (currentChunk || sentence.length >= 75) {
-                        processedItems.push({
-                            text: currentChunk ? currentChunk + ' ' + sentence : sentence
-                        });
-                        currentChunk = '';
-                    } 
-                    else if (i === sentences.length - 1 && processedItems.length > 0) {
-                        processedItems[processedItems.length - 1].text += ' ' + sentence;
-                    }
-                    else {
-                        processedItems.push({ text: sentence });
-                    }
+                // Processa cada frase individualmente
+                while ((match = sentenceRegex.exec(cleanedText)) !== null) {
+                    sentences.push(match[0].trim());
                 }
                 
-                items = processedItems;
+                // Se não encontrou frases (texto sem pontuação), trata como uma única frase
+                if (sentences.length === 0) {
+                    sentences = [cleanedText.trim()];
+                }
+                
+                // Cria os itens - cada frase é um item, mesmo que curta
+                items = sentences.map(text => ({ text }));
                 originalItems = [...items];
                 currentIndex = 0;
                 isQAMode = false;
@@ -1143,17 +1137,23 @@
                             }
                         }
                         
-                        // Agora podemos verificar o formato do conteúdo
+                        // Verifica se o arquivo tem delimitadores de Q&A
                         const hasTabs = contentString.includes('\t');
                         const hasDoubleSemicolon = contentString.includes(';;');
-                        const isAlternatingLines = checkAlternatingLinesFormat(contentString);
                         
                         if (hasTabs || hasDoubleSemicolon) {
+                            // Se tem delimitadores, trata como Q&A independente do número de linhas
                             parseQAContent(contentString);
-                        } else if (isAlternatingLines) {
-                            parseAlternatingLinesContent(contentString);
                         } else {
-                            parseTextContent(contentString);
+                            // Verifica se é Q&A no formato de linhas alternadas
+                            const isAlternatingLines = checkAlternatingLinesFormat(contentString);
+                            
+                            if (isAlternatingLines) {
+                                parseAlternatingLinesContent(contentString);
+                            } else {
+                                // Se não for nenhum dos casos acima, trata como texto normal
+                                parseTextContent(contentString);
+                            }
                         }
                         
                         updateDisplay();
