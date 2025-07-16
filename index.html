@@ -930,49 +930,54 @@ function checkAlternatingLinesFormat(text) {
             }
 
 function parseTextContent(text) {
-    // Primeiro, preserva as quebras de linha originais para análise
-    const lines = text.split(/\r?\n/);
-    let fullText = lines.map(line => line.trim()).join(' ');
+    // 1. Normaliza quebras de linha e espaços
+    let normalizedText = text.replace(/(\r\n|\n|\r)/g, ' ').replace(/\s+/g, ' ').trim();
     
-    // Divide em frases mantendo os delimitadores
+    // 2. Divide em frases usando pontuação como delimitador
     const sentenceRegex = /[^.!?…]*[.!?…]+/g;
     let sentences = [];
     let match;
-    while ((match = sentenceRegex.exec(fullText)) !== null) {
-        if (match[0].trim().length > 0) {
-            sentences.push(match[0].trim());
+    while ((match = sentenceRegex.exec(normalizedText)) !== null) {
+        const sentence = match[0].trim();
+        if (sentence.length > 0) {
+            sentences.push(sentence);
         }
     }
     
+    // 3. Agrupa frases em cartões com mínimo de 75 caracteres
     let processedItems = [];
-    let currentChunk = '';
+    let currentCard = '';
     
-    for (let i = 0; i < sentences.length; i++) {
-        const sentence = sentences[i];
-        
-        // Se a frase atual tem mais de 75 caracteres, adiciona como está
+    for (const sentence of sentences) {
+        // Se a frase sozinha já tem mais de 75 chars, adiciona como cartão único
         if (sentence.length >= 75) {
-            if (currentChunk) {
-                processedItems.push({ text: currentChunk });
-                currentChunk = '';
+            if (currentCard) {
+                processedItems.push({ text: currentCard });
+                currentCard = '';
             }
             processedItems.push({ text: sentence });
             continue;
         }
         
-        // Adiciona a frase ao chunk atual
-        currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
+        // Verifica se adicionando ao cartão atual ultrapassa 75 chars
+        const potentialCard = currentCard ? `${currentCard} ${sentence}` : sentence;
         
-        // Se o chunk atual atingiu o tamanho mínimo ou é a última frase
-        if (currentChunk.length >= 75 || i === sentences.length - 1) {
-            processedItems.push({ text: currentChunk });
-            currentChunk = '';
+        if (potentialCard.length >= 75) {
+            processedItems.push({ text: potentialCard });
+            currentCard = '';
+        } else {
+            currentCard = potentialCard;
         }
     }
     
-    // Adiciona qualquer chunk restante que possa ter ficado
-    if (currentChunk) {
-        processedItems.push({ text: currentChunk });
+    // Adiciona o último cartão se houver conteúdo restante
+    if (currentCard) {
+        processedItems.push({ text: currentCard });
+    }
+    
+    // 4. Se nenhum cartão atingiu 75 chars, junta tudo em um
+    if (processedItems.length === 0 && sentences.length > 0) {
+        processedItems.push({ text: sentences.join(' ') });
     }
     
     items = processedItems;
