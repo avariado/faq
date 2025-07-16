@@ -929,50 +929,54 @@
             }
 
             function parseTextContent(text) {
-                // Check if it's a QA file (tab or :: separated)
-                if (text.includes('\t') || text.includes('::')) {
-                    // Process as QA file
-                    let lines = text.split(/\r\n|\n|\r/).filter(line => line.trim().length > 0);
-                    items = lines.map(line => {
-                        let parts = line.split(/\t|::/);
-                        return {
-                            question: parts[0]?.trim() || '',
-                            answer: parts[1]?.trim() || ''
-                        };
-                    });
-                    originalItems = [...items];
-                    currentIndex = 0;
-                    isQAMode = true;
-                    saveState();
-                    return;
-                }
-            
-                // Check if any line contains multiple sentences
-                let lines = text.split(/\r\n|\n|\r/).filter(line => line.trim().length > 0);
-                let isQACandidate = true;
-                for (let line of lines) {
-                    // Count sentence-ending punctuation marks
-                    let punctuationCount = (line.match(/[.!?…]/g) || []).length;
-                    // If we find a line with more than one punctuation mark, it's not a QA file
-                    if (punctuationCount > 1) {
-                        isQACandidate = false;
-                        break;
+                // Verifica se é ficheiro QA com delimitadores
+                const hasQADelimiters = text.includes('\t') || text.includes('::');
+                
+                if (!hasQADelimiters) {
+                    // Verifica se alguma linha tem mais de uma frase
+                    const lines = text.split(/\r\n|\n|\r/).filter(line => line.trim().length > 0);
+                    let hasMultiSentenceLine = false;
+                    
+                    for (const line of lines) {
+                        // Conta pontuações de fim de frase
+                        const sentenceCount = (line.split(/[.!?…]/).length - 1);
+                        if (sentenceCount > 1) {
+                            hasMultiSentenceLine = true;
+                            break;
+                        }
                     }
-                }
-            
-                if (isQACandidate && lines.length > 0) {
-                    // Process as QA file (one sentence per line)
-                    items = lines.map(line => ({
-                        text: line.trim()
-                    }));
+                    
+                    // Se encontrou linha com múltiplas frases, processa como texto normal
+                    if (hasMultiSentenceLine) {
+                        processAsNormalText(text);
+                        return;
+                    }
+                    
+                    // Se todas linhas têm 0 ou 1 frase, trata como QA (uma frase por linha)
+                    items = lines.map(line => ({ text: line.trim() }));
                     originalItems = [...items];
                     currentIndex = 0;
                     isQAMode = false;
                     saveState();
                     return;
                 }
+                
+                // Processa como QA com delimitadores
+                const lines = text.split(/\r\n|\n|\r/).filter(line => line.trim().length > 0);
+                items = lines.map(line => {
+                    const parts = line.split(/\t|::/);
+                    return {
+                        question: parts[0]?.trim() || '',
+                        answer: parts[1]?.trim() || ''
+                    };
+                });
+                originalItems = [...items];
+                currentIndex = 0;
+                isQAMode = true;
+                saveState();
+            }
             
-                // Process as normal text file
+            function processAsNormalText(text) {
                 let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?…])/g, ' ');
                 cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
                 
@@ -989,19 +993,11 @@
                     if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
                         currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
                     } else {
-                        if (currentChunk) {
-                            processedItems.push({
-                                text: currentChunk + ' ' + sentence
-                            });
-                            currentChunk = '';
-                        } else {
-                            processedItems.push({ text: sentence });
-                        }
+                        processedItems.push({
+                            text: currentChunk ? currentChunk + ' ' + sentence : sentence
+                        });
+                        currentChunk = '';
                     }
-                }
-                
-                if (currentChunk) {
-                    processedItems.push({ text: currentChunk });
                 }
                 
                 items = processedItems;
