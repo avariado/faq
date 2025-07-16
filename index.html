@@ -929,14 +929,12 @@
             }
 
             function parseTextContent(text) {
-                // Primeiro, verifica se há linhas com múltiplas frases
-                const lines = text.split('\n');
-                let hasMultiSentenceLines = false;
+                const lines = text.split('\n').filter(line => line.trim() !== '');
                 
+                // Verifica se há linhas com múltiplas frases
+                let hasMultiSentenceLines = false;
                 for (const line of lines) {
                     const trimmedLine = line.trim();
-                    if (trimmedLine === '') continue;
-                    
                     // Conta o número de frases (terminadas com .!? ou ...)
                     const sentenceCount = (trimmedLine.match(/[.!?…]+/g) || []).length;
                     
@@ -947,10 +945,13 @@
                     }
                 }
                 
-                // Se não houver linhas com múltiplas frases e o número de linhas for par, pode ser Q&A
+                // Se não houver linhas com múltiplas frases E o número de linhas for par, pode ser Q&A
                 if (!hasMultiSentenceLines && lines.length > 1 && lines.length % 2 === 0) {
-                    parseAlternatingLinesContent(text);
-                    return;
+                    // Verificação adicional: pelo menos 2 pares de linhas para considerar como Q&A
+                    if (lines.length >= 4) {
+                        parseAlternatingLinesContent(text);
+                        return;
+                    }
                 }
                 
                 // Caso contrário, processa como texto normal
