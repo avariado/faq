@@ -947,27 +947,34 @@ function parseTextContent(text) {
     for (let i = 0; i < sentences.length; i++) {
         const sentence = sentences[i];
         
-        // Se o chunk atual + nova frase tiver menos de 75 chars e não for a última frase
-        if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
-            currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
-        } else {
-            // Adiciona o chunk atual + frase atual (ou só a frase se chunk estiver vazio)
-            if (currentChunk) {
-                processedItems.push({ text: currentChunk + ' ' + sentence });
+        // Se for a primeira frase do chunk
+        if (currentChunk === '') {
+            currentChunk = sentence;
+        } 
+        // Se adicionando esta frase não ultrapassar 75 chars E não for a última frase
+        else if ((currentChunk.length + sentence.length + 1) < 75 && i < sentences.length - 1) {
+            currentChunk += ' ' + sentence;
+        }
+        // Se já tiver 75 chars ou for a última frase
+        else {
+            // Se o chunk atual já tem pelo menos 75 chars OU é a última frase
+            if (currentChunk.length >= 75 || i === sentences.length - 1) {
+                processedItems.push({ text: currentChunk + (i === sentences.length - 1 ? ' ' + sentence : '') });
                 currentChunk = '';
-            } else {
-                processedItems.push({ text: sentence });
+            } 
+            // Se não atingiu 75 chars mas a próxima frase ultrapassaria
+            else {
+                processedItems.push({ text: currentChunk });
+                currentChunk = sentence;
             }
         }
     }
     
-    // Se sobrou algum chunk no final, adiciona
+    // Garante que qualquer conteúdo restante seja adicionado
     if (currentChunk) {
         if (processedItems.length > 0) {
-            // Adiciona ao último item se já existirem itens
             processedItems[processedItems.length - 1].text += ' ' + currentChunk;
         } else {
-            // Caso raro: texto muito curto
             processedItems.push({ text: currentChunk });
         }
     }
