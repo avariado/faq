@@ -929,10 +929,54 @@
             }
 
             function parseTextContent(text) {
-                let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
+                // Check if it's a QA file (tab or :: separated)
+                if (text.includes('\t') || text.includes('::')) {
+                    // Process as QA file
+                    let lines = text.split(/\r\n|\n|\r/).filter(line => line.trim().length > 0);
+                    items = lines.map(line => {
+                        let parts = line.split(/\t|::/);
+                        return {
+                            question: parts[0]?.trim() || '',
+                            answer: parts[1]?.trim() || ''
+                        };
+                    });
+                    originalItems = [...items];
+                    currentIndex = 0;
+                    isQAMode = true;
+                    saveState();
+                    return;
+                }
+            
+                // Check if any line contains multiple sentences
+                let lines = text.split(/\r\n|\n|\r/).filter(line => line.trim().length > 0);
+                let isQACandidate = true;
+                for (let line of lines) {
+                    // Count sentence-ending punctuation marks
+                    let punctuationCount = (line.match(/[.!?…]/g) || []).length;
+                    // If we find a line with more than one punctuation mark, it's not a QA file
+                    if (punctuationCount > 1) {
+                        isQACandidate = false;
+                        break;
+                    }
+                }
+            
+                if (isQACandidate && lines.length > 0) {
+                    // Process as QA file (one sentence per line)
+                    items = lines.map(line => ({
+                        text: line.trim()
+                    }));
+                    originalItems = [...items];
+                    currentIndex = 0;
+                    isQAMode = false;
+                    saveState();
+                    return;
+                }
+            
+                // Process as normal text file
+                let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?…])/g, ' ');
                 cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
                 
-                const sentenceRegex = /[^.!?]+[.!?…]+/g;
+                const sentenceRegex = /[^.!?…]+[.!?…]+/g;
                 let sentences = cleanedText.match(sentenceRegex) || [];
                 sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
                 
@@ -944,21 +988,20 @@
                     
                     if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
                         currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
-                        continue;
+                    } else {
+                        if (currentChunk) {
+                            processedItems.push({
+                                text: currentChunk + ' ' + sentence
+                            });
+                            currentChunk = '';
+                        } else {
+                            processedItems.push({ text: sentence });
+                        }
                     }
-                    
-                    if (currentChunk || sentence.length >= 75) {
-                        processedItems.push({
-                            text: currentChunk ? currentChunk + ' ' + sentence : sentence
-                        });
-                        currentChunk = '';
-                    } 
-                    else if (i === sentences.length - 1 && processedItems.length > 0) {
-                        processedItems[processedItems.length - 1].text += ' ' + sentence;
-                    }
-                    else {
-                        processedItems.push({ text: sentence });
-                    }
+                }
+                
+                if (currentChunk) {
+                    processedItems.push({ text: currentChunk });
                 }
                 
                 items = processedItems;
