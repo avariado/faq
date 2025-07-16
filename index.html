@@ -929,27 +929,13 @@
             }
 
             function parseTextContent(text) {
-                // First normalize line breaks and clean up whitespace
-                let cleanedText = text.replace(/\r\n/g, '\n')
-                                     .replace(/\n+/g, '\n')
-                                     .replace(/\s+/g, ' ')
-                                     .trim();
+                let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
+                cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
                 
-                // Enhanced sentence splitting that handles multiple sentences per line
-                const sentenceRegex = /[^.!?…]*[.!?…]+[\])'"`’”]*\s*/g;
-                let sentences = [];
-                let match;
-                
-                while ((match = sentenceRegex.exec(cleanedText)) !== null) {
-                    if (match[0].trim().length > 0) {
-                        sentences.push(match[0].trim());
-                    }
-                }
-                
-                // If we couldn't split into sentences, treat each line as a separate item
-                if (sentences.length === 0) {
-                    sentences = text.split('\n').filter(line => line.trim().length > 0);
-                }
+                // Regex melhorada para detectar frases
+                const sentenceRegex = /[^.!?]+[.!?…]+(\s|$)/g;
+                let sentences = cleanedText.match(sentenceRegex) || [];
+                sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
                 
                 let processedItems = [];
                 let currentChunk = '';
@@ -957,30 +943,30 @@
                 for (let i = 0; i < sentences.length; i++) {
                     const sentence = sentences[i];
                     
-                    // Always add the sentence if it's long enough by itself
-                    if (sentence.length >= 75) {
-                        if (currentChunk) {
-                            processedItems.push({ text: currentChunk });
-                            currentChunk = '';
-                        }
-                        processedItems.push({ text: sentence });
-                        continue;
-                    }
-                    
-                    // If combining with current chunk would be too long, finalize current chunk
-                    if (currentChunk && (currentChunk.length + sentence.length + 1) >= 75) {
-                        processedItems.push({ text: currentChunk });
-                        currentChunk = sentence;
-                    } 
-                    // Otherwise add to current chunk
-                    else {
+                    // Se a frase atual é muito curta e não é a última, agrupa com a próxima
+                    if ((currentChunk.length + sentence.length < 75) && (i < sentences.length - 1)) {
                         currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
+                    } else {
+                        // Adiciona o chunk atual (se houver) mais a frase atual
+                        if (currentChunk) {
+                            processedItems.push({
+                                text: currentChunk + ' ' + sentence
+                            });
+                            currentChunk = '';
+                        } else {
+                            processedItems.push({ text: sentence });
+                        }
                     }
                 }
                 
-                // Add any remaining content
+                // Garante que nenhuma frase foi perdida
                 if (currentChunk) {
-                    processedItems.push({ text: currentChunk });
+                    if (processedItems.length > 0) {
+                        // Adiciona ao último item se já existirem itens
+                        processedItems[processedItems.length - 1].text += ' ' + currentChunk;
+                    } else {
+                        processedItems.push({ text: currentChunk });
+                    }
                 }
                 
                 items = processedItems;
@@ -988,6 +974,37 @@
                 currentIndex = 0;
                 isQAMode = false;
                 saveState();
+            }
+
+            function checkIfSingleSentence(line) {
+                if (!line.trim()) return false;
+                
+                // Conta quantos terminadores de frase existem
+                const punctuationCount = (line.match(/[.!?…]/g) || []).length;
+                
+                // Considera como frase única se:
+                // 1. Não tem nenhum terminador OU
+                // 2. Tem apenas um terminador no final
+                return punctuationCount === 0 || 
+                      (punctuationCount === 1 && /[.!?…]\s*$/.test(line));
+            }
+
+            function processTextContent(text) {
+                const lines = text.split('\n').filter(line => line.trim() !== '');
+                
+                // Verifica se todas as linhas são frases únicas (sem múltiplos terminadores)
+                const allSingleSentences = lines.every(line => checkIfSingleSentence(line));
+                
+                if (allSingleSentences && lines.length >= 2) {
+                    // Formato de linhas alternadas (pergunta/resposta)
+                    parseAlternatingLinesContent(text);
+                } else if (text.includes('\t') || text.includes(';;')) {
+                    // Formato com delimitadores
+                    parseQAContent(text);
+                } else {
+                    // Texto normal
+                    parseTextContent(text);
+                }
             }
 
             function updateDisplay() {
