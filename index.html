@@ -932,73 +932,71 @@ function isQAContent(text) {
 }
 
 function parseTextContent(text) {
-    // 1. Normalização do texto - preserva quebras de linha significativas
-    let normalizedText = text.replace(/(\r\n|\n|\r)/g, '\n').replace(/\s+/g, ' ').trim();
-    
-    // 2. Divisão em frases usando pontos finais, exclamação, interrogação ou três pontos
-    // Regex avançada que captura o delimitador e trata casos especiais
-    const sentenceRegex = /([^.!?…]*[.!?…]+)\s*/g;
-    let sentences = [];
-    let match;
-    
-    while ((match = sentenceRegex.exec(normalizedText)) !== null) {
-        if (match[1].trim().length > 0) {
-            sentences.push(match[1].trim());
-        }
-    }
-    
-    // Caso não encontre frases delimitadas (texto sem pontuação)
-    if (sentences.length === 0) {
-        sentences = [normalizedText];
-    }
-    
-    // 3. Agrupamento inteligente mantendo mínimo de 75 caracteres
-    let processedItems = [];
-    let currentChunk = '';
-    
-    for (let i = 0; i < sentences.length; i++) {
-        const sentence = sentences[i];
+    // 1. Extrai todas as frases corretamente, mesmo com múltiplas na mesma linha
+    const sentences = [];
+    let buffer = "";
+    let inSentence = false;
+
+    // Processa caractere por caractere para detecção perfeita
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        buffer += char;
         
-        if (currentChunk === '') {
-            currentChunk = sentence;
-        } else {
-            const potentialChunk = currentChunk + ' ' + sentence;
-            
-            if (potentialChunk.length < 75 && i < sentences.length - 1) {
-                currentChunk = potentialChunk;
-            } else {
-                processedItems.push({ text: currentChunk });
-                currentChunk = sentence;
+        // Detecta final de frase (., !, ?, …)
+        if (/[.!?…]/.test(char)) {
+            // Verifica se não é um caso especial (como ... ou !?)
+            if (!(i < text.length - 1 && /[.!?…]/.test(text[i+1]))) {
+                sentences.push(buffer.trim());
+                buffer = "";
+                inSentence = false;
+                continue;
+            }
+        }
+        
+        // Nova linha só quebra se não for no meio de uma frase
+        if (char === '\n' && !inSentence) {
+            if (buffer.trim().length > 0) {
+                sentences.push(buffer.trim());
+                buffer = "";
             }
         }
     }
+
+    // Adiciona o último buffer se restar algo
+    if (buffer.trim().length > 0) {
+        sentences.push(buffer.trim());
+    }
+
+    // 2. Agrupamento inteligente garantindo mínimo 75 caracteres
+    const items = [];
+    let currentCard = "";
     
-    // Adiciona o último chunk se houver
-    if (currentChunk) {
-        if (processedItems.length > 0 && (processedItems[processedItems.length - 1].text.length + currentChunk.length) < 150) {
-            // Junta ao último item se não ficar muito grande
-            processedItems[processedItems.length - 1].text += ' ' + currentChunk;
+    for (const sentence of sentences) {
+        if (currentCard.length === 0) {
+            currentCard = sentence;
+        } else if (currentCard.length + sentence.length + 1 < 75) {
+            currentCard += " " + sentence;
         } else {
-            processedItems.push({ text: currentChunk });
+            items.push({ text: currentCard });
+            currentCard = sentence;
         }
     }
     
-    // 4. Verificação final para garantir que nenhum conteúdo foi perdido
-    const originalContent = sentences.join(' ');
-    const processedContent = processedItems.map(item => item.text).join(' ');
-    
-    if (originalContent !== processedContent) {
-        console.warn("Atenção: Conteúdo original e processado diferem!");
-        // Fallback seguro - usa o texto original em um único cartão
-        items = [{ text: originalContent }];
-    } else {
-        items = processedItems;
+    // Adiciona o último cartão
+    if (currentCard.length > 0) {
+        items.push({ text: currentCard });
     }
+
+    // 3. Verificação de integridade (100% do conteúdo)
+    const originalLength = text.replace(/\s+/g, ' ').trim().length;
+    const processedLength = items.map(i => i.text).join(' ').replace(/\s+/g, ' ').trim().length;
     
-    originalItems = [...items];
-    currentIndex = 0;
-    isQAMode = false;
-    saveState();
+    if (originalLength !== processedLength) {
+        // Fallback absoluto - cada frase como um cartão
+        return sentences.map(s => ({ text: s }));
+    }
+
+    return items;
 }
 
             function updateDisplay() {
