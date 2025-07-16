@@ -838,18 +838,19 @@
 
             function checkAlternatingLinesFormat(text) {
                 const lines = text.split('\n').filter(line => line.trim() !== '');
+                if (lines.length < 2) return false;
                 
-                // Verifica se alguma linha tem múltiplas frases
                 for (const line of lines) {
                     const trimmedLine = line.trim();
-                    // Verifica se há mais de um ponto final, exclamação ou interrogação
-                    if ((trimmedLine.match(/[.!?…]/g) || []).length > 1) {
+                    if (trimmedLine.split('.').length > 2 && !trimmedLine.endsWith('.')) {
+                        return false;
+                    }
+                    if ((trimmedLine.match(/[.!?]/g) || []).length > 1) {
                         return false;
                     }
                 }
                 
-                // Se não encontrou linhas com múltiplas frases, verifica se é Q&A válido
-                return lines.length % 2 === 0;
+                return true;
             }
 
             function loadSampleData() {
@@ -928,39 +929,6 @@
             }
 
             function parseTextContent(text) {
-                // Primeiro, preservamos as quebras de linha originais para análise
-                const originalLines = text.split('\n').filter(line => line.trim() !== '');
-                
-                // Verifica se há linhas com múltiplas frases
-                let hasMultiSentenceLines = false;
-                for (const line of originalLines) {
-                    const trimmedLine = line.trim();
-                    if ((trimmedLine.match(/[.!?…]/g) || []).length > 1) {
-                        hasMultiSentenceLines = true;
-                        break;
-                    }
-                }
-                
-                // Se não há linhas com múltiplas frases e o número de linhas é par, verifica se é Q&A
-                if (!hasMultiSentenceLines && originalLines.length % 2 === 0) {
-                    let isPotentialQA = true;
-                    for (let i = 0; i < originalLines.length; i += 2) {
-                        const question = originalLines[i].trim();
-                        const answer = originalLines[i+1].trim();
-                        // Verifica se a "pergunta" termina com pontuação
-                        if (/[.!?…]$/.test(question)) {
-                            isPotentialQA = false;
-                            break;
-                        }
-                    }
-                    
-                    if (isPotentialQA) {
-                        parseAlternatingLinesContent(text);
-                        return;
-                    }
-                }
-                
-                // Se não for Q&A, processa como texto normal
                 let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
                 cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
                 
@@ -974,29 +942,22 @@
                 for (let i = 0; i < sentences.length; i++) {
                     const sentence = sentences[i];
                     
-                    // Se ainda não atingiu o mínimo de caracteres e não é a última frase
                     if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
                         currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
                         continue;
                     }
                     
-                    // Se atingiu o mínimo ou é a última frase
-                    if (currentChunk) {
+                    if (currentChunk || sentence.length >= 75) {
                         processedItems.push({
-                            text: currentChunk + ' ' + sentence
+                            text: currentChunk ? currentChunk + ' ' + sentence : sentence
                         });
                         currentChunk = '';
-                    } else {
-                        processedItems.push({ text: sentence });
+                    } 
+                    else if (i === sentences.length - 1 && processedItems.length > 0) {
+                        processedItems[processedItems.length - 1].text += ' ' + sentence;
                     }
-                }
-                
-                // Garante que a última frase não seja perdida
-                if (currentChunk) {
-                    if (processedItems.length > 0) {
-                        processedItems[processedItems.length - 1].text += ' ' + currentChunk;
-                    } else {
-                        processedItems.push({ text: currentChunk });
+                    else {
+                        processedItems.push({ text: sentence });
                     }
                 }
                 
@@ -1225,6 +1186,22 @@
                 processingMessage.style.display = 'block';
             
                 try {
+                    // 1. Verificação do cabeçalho do PDF
+                    const isPDF = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            const arr = new Uint8Array(e.target.result.slice(0, 4));
+                            const header = Array.from(arr).map(b => b.toString(16)).join('');
+                            resolve(header === '25504446'); // %PDF em hexadecimal
+                        };
+                        reader.readAsArrayBuffer(file.slice(0, 4));
+                    });
+            
+                    if (!isPDF) {
+                        throw new Error("O arquivo não é um PDF válido");
+                    }
+            
+                    // 2. Carregamento do PDF com configurações otimizadas
                     const arrayBuffer = await file.arrayBuffer();
                     const pdf = await pdfjsLib.getDocument({
                         data: arrayBuffer,
@@ -1232,21 +1209,26 @@
                         cMapPacked: true
                     }).promise;
             
+                    // 3. Processamento seguro das páginas
                     let fullText = '';
                     
                     for (let i = 1; i <= pdf.numPages; i++) {
                         const page = await pdf.getPage(i);
                         const textContent = await page.getTextContent();
                         
+                        // Processamento seguro dos itens de texto
                         const pageText = textContent.items
                             .map(item => {
+                                // Verificação segura da propriedade transform
                                 const yPos = item.transform ? item.transform[5] : 0;
                                 return {
                                     text: item.str,
                                     yPos: yPos
                                 };
                             })
+                            // Ordena por posição vertical (Y)
                             .sort((a, b) => b.yPos - a.yPos)
+                            // Agrupa por linha
                             .reduce((acc, curr, index, array) => {
                                 if (index === 0 || Math.abs(curr.yPos - array[index-1].yPos) > 5) {
                                     acc.push([curr]);
@@ -1255,57 +1237,57 @@
                                 }
                                 return acc;
                             }, [])
+                            // Concatena o texto
                             .map(line => line.map(item => item.text).join(' '))
                             .join('\n');
             
                         fullText += pageText + '\n\n';
                     }
             
-                    // Verifica se é Q&A com separadores
-                    const hasTabs = fullText.includes('\t');
-                    const hasDoubleSemicolon = fullText.includes(';;');
+                    // 4. Detecção do formato (Q&A ou texto normal)
+                    const lines = fullText.split('\n').filter(line => line.trim() !== '');
                     
-                    if (hasTabs || hasDoubleSemicolon) {
-                        parseQAContent(fullText);
-                    } else {
-                        // Verifica se há linhas com múltiplas frases
-                        const lines = fullText.split('\n').filter(line => line.trim() !== '');
-                        let hasMultiSentenceLines = false;
-                        
-                        for (const line of lines) {
-                            if ((line.match(/[.!?…]/g) || []).length > 1) {
-                                hasMultiSentenceLines = true;
-                                break;
-                            }
+                    // Verifica se o texto parece ser perguntas e respostas (linhas alternadas)
+                    let isAlternatingLines = true;
+                    for (let i = 0; i < Math.min(lines.length, 10); i++) {
+                        const line = lines[i].trim();
+                        // Se alguma linha tiver múltiplas frases (mais de um ponto final), não é Q&A
+                        if ((line.match(/[.!?]/g) || []).length > 1) {
+                            isAlternatingLines = false;
+                            break;
                         }
+                    }
+            
+                    if (isAlternatingLines && lines.length > 1) {
+                        // Verifica se o número de linhas é par para Q&A
+                        if (lines.length % 2 !== 0) {
+                            alert("Aviso: O número de linhas não é par. A última linha será ignorada.");
+                        }
+                        parseAlternatingLinesContent(fullText);
+                    } else {
+                        // Verifica se há separadores de Q&A (tabs ou ;;)
+                        const hasTabs = fullText.includes('\t');
+                        const hasDoubleSemicolon = fullText.includes(';;');
                         
-                        if (!hasMultiSentenceLines && lines.length % 2 === 0) {
-                            // Verifica se parece ser Q&A (pergunta sem pontuação final)
-                            let isPotentialQA = true;
-                            for (let i = 0; i < lines.length; i += 2) {
-                                const question = lines[i].trim();
-                                if (/[.!?…]$/.test(question)) {
-                                    isPotentialQA = false;
-                                    break;
-                                }
-                            }
-                            
-                            if (isPotentialQA) {
-                                parseAlternatingLinesContent(fullText);
-                            } else {
-                                parseTextContent(fullText);
-                            }
+                        if (hasTabs || hasDoubleSemicolon) {
+                            parseQAContent(fullText);
                         } else {
                             parseTextContent(fullText);
                         }
                     }
             
-                    updateDisplay();
+                    updateDisplay(); // Atualiza a exibição imediatamente após a importação
                 } catch (error) {
                     console.error("Erro no processamento:", error);
-                    processingMessage.textContent = "Tentando como arquivo de texto...";
-                    await new Promise(resolve => setTimeout(resolve, 1500));
-                    processTextFile(file);
+                    
+                    // Fallback para processamento como texto simples
+                    if (error.message.includes("Invalid PDF") || error.message.includes("cabeçalho")) {
+                        processingMessage.textContent = "Tentando como arquivo de texto...";
+                        await new Promise(resolve => setTimeout(resolve, 1500));
+                        processTextFile(file);
+                    } else {
+                        alert(`Erro: ${error.message}\nConsulte o console para detalhes.`);
+                    }
                 } finally {
                     processingMessage.style.display = 'none';
                 }
