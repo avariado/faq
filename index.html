@@ -932,50 +932,21 @@ function isQAContent(text) {
 }
 
 function parseTextContent(text) {
-    // 1. Extrai todas as frases corretamente, mesmo com múltiplas na mesma linha
-    const sentences = [];
-    let buffer = "";
-    let inSentence = false;
-
-    // Processa caractere por caractere para detecção perfeita
-    for (let i = 0; i < text.length; i++) {
-        const char = text[i];
-        buffer += char;
-        
-        // Detecta final de frase (., !, ?, …)
-        if (/[.!?…]/.test(char)) {
-            // Verifica se não é um caso especial (como ... ou !?)
-            if (!(i < text.length - 1 && /[.!?…]/.test(text[i+1]))) {
-                sentences.push(buffer.trim());
-                buffer = "";
-                inSentence = false;
-                continue;
-            }
-        }
-        
-        // Nova linha só quebra se não for no meio de uma frase
-        if (char === '\n' && !inSentence) {
-            if (buffer.trim().length > 0) {
-                sentences.push(buffer.trim());
-                buffer = "";
-            }
-        }
-    }
-
-    // Adiciona o último buffer se restar algo
-    if (buffer.trim().length > 0) {
-        sentences.push(buffer.trim());
-    }
-
-    // 2. Agrupamento inteligente garantindo mínimo 75 caracteres
+    // 1. Remove múltiplos espaços e quebras desnecessárias, MAS mantém a estrutura original
+    const cleanedText = text.replace(/\s+/g, ' ').trim();
+    
+    // 2. Divide em frases de forma PERFEITA
+    const sentences = cleanedText.split(/(?<=[.!?…])\s+/);
+    
+    // 3. Agrupa mantendo MÍNIMO 75 caracteres, SEM PERDER NADA
     const items = [];
-    let currentCard = "";
+    let currentCard = '';
     
     for (const sentence of sentences) {
         if (currentCard.length === 0) {
             currentCard = sentence;
-        } else if (currentCard.length + sentence.length + 1 < 75) {
-            currentCard += " " + sentence;
+        } else if ((currentCard + ' ' + sentence).length < 75) {
+            currentCard += ' ' + sentence;
         } else {
             items.push({ text: currentCard });
             currentCard = sentence;
@@ -986,16 +957,7 @@ function parseTextContent(text) {
     if (currentCard.length > 0) {
         items.push({ text: currentCard });
     }
-
-    // 3. Verificação de integridade (100% do conteúdo)
-    const originalLength = text.replace(/\s+/g, ' ').trim().length;
-    const processedLength = items.map(i => i.text).join(' ').replace(/\s+/g, ' ').trim().length;
     
-    if (originalLength !== processedLength) {
-        // Fallback absoluto - cada frase como um cartão
-        return sentences.map(s => ({ text: s }));
-    }
-
     return items;
 }
 
