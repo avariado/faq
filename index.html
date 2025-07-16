@@ -1198,76 +1198,49 @@ async function processPDFFile(file) {
     processingMessage.style.display = 'block';
 
     try {
-        // 1. Verificação do cabeçalho do PDF
-        const isPDF = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const arr = new Uint8Array(e.target.result.slice(0, 4));
-                const header = Array.from(arr).map(b => b.toString(16)).join('');
-                resolve(header === '25504446');
-            };
-            reader.readAsArrayBuffer(file.slice(0, 4));
-        });
-
-        if (!isPDF) {
-            throw new Error("O arquivo não é um PDF válido");
-        }
-
-        // 2. Carregamento do PDF
+        // 1. Extração do texto do PDF
         const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({
-            data: arrayBuffer,
-            cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
-            cMapPacked: true
-        }).promise;
-
-        // 3. Extração do texto
+        const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
         let fullText = '';
+
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
-            fullText += textContent.items.map(item => item.str).join(' ') + '\n\n';
+            fullText += textContent.items.map(item => item.str).join(' ') + '\n';
         }
 
-        // 4. Análise rigorosa para determinar o formato
+        // 2. Análise estrita conforme suas instruções
         const lines = fullText.split('\n').filter(line => line.trim() !== '');
-        let isQnA = false;
+        let isStrictQnA = false;
 
-        // Verifica primeiro por delimitadores explícitos
-        const hasExplicitDelimiters = fullText.includes('\t') || fullText.includes(';;');
+        // Verificação 1: Tem delimitadores tab ou ;;
+        const hasDelimiters = fullText.includes('\t') || fullText.includes(';;');
         
-        if (hasExplicitDelimiters) {
-            isQnA = true;
-        } else {
-            // Verificação rigorosa para Q&A sem delimitadores
-            if (lines.length >= 2) {
-                isQnA = true;
-                for (const line of lines) {
-                    // Se qualquer linha tiver múltiplas frases, não é Q&A
-                    const sentenceCount = (line.match(/[.!?…]+(\s|$)/g) || []).length;
-                    if (sentenceCount > 1) {
-                        isQnA = false;
-                        break;
-                    }
-                }
+        // Verificação 2: Nenhuma linha tem múltiplas frases
+        let hasMultiSentenceLines = false;
+        for (const line of lines) {
+            const sentenceEndings = (line.match(/[.!?…]/g) || []).length;
+            if (sentenceEndings > 1) {
+                hasMultiSentenceLines = true;
+                break;
             }
         }
 
-        // 5. Processamento conforme o formato detectado
-        if (isQnA && hasExplicitDelimiters) {
+        // Regra definitiva (conforme suas instruções):
+        isStrictQnA = hasDelimiters || (!hasMultiSentenceLines && lines.length % 2 === 0);
+
+        // 3. Processamento conforme análise
+        if (isStrictQnA && hasDelimiters) {
             parseQAContent(fullText);
-        } else if (isQnA) {
+        } else if (isStrictQnA) {
             parseAlternatingLinesContent(fullText);
         } else {
-            parseTextContent(fullText);
+            parseTextContent(fullText); // Sempre que houver linhas com múltiplas frases
         }
 
-        updateDisplay();
     } catch (error) {
-        console.error("Erro no processamento:", error);
-        processingMessage.textContent = "Tentando como arquivo de texto...";
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        processTextFile(file);
+        console.error("Erro no PDF:", error);
+        processTextFile(file); // Fallback para texto
     } finally {
         processingMessage.style.display = 'none';
     }
