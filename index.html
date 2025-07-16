@@ -937,29 +937,24 @@ function parseTextContent(text) {
         for (let i = 0; i < sentences.length; i++) {
             const sentence = sentences[i];
             
-            // Se o chunk atual + nova frase tiver menos de 75 caracteres e não for a última frase
-            if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
+            // Se for a primeira frase ou o chunk atual + nova frase tiver menos de 75 caracteres
+            if (currentChunk.length === 0 || currentChunk.length + sentence.length < 75) {
                 currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
+                
+                // Se for a última frase, adiciona o chunk atual
+                if (i === sentences.length - 1) {
+                    processedItems.push({ text: currentChunk });
+                }
             } else {
-                // Adiciona o chunk atual + frase atual
-                if (currentChunk) {
-                    processedItems.push({
-                        text: currentChunk + ' ' + sentence
-                    });
-                    currentChunk = '';
-                } else {
-                    // Se não há chunk acumulado, adiciona a frase sozinha
+                // Adiciona o chunk atual
+                processedItems.push({ text: currentChunk });
+                // Começa um novo chunk com a frase atual
+                currentChunk = sentence;
+                
+                // Se for a última frase, adiciona sozinha
+                if (i === sentences.length - 1) {
                     processedItems.push({ text: sentence });
                 }
-            }
-        }
-        
-        // Adiciona qualquer chunk restante
-        if (currentChunk) {
-            if (processedItems.length > 0) {
-                processedItems[processedItems.length - 1].text += ' ' + currentChunk;
-            } else {
-                processedItems.push({ text: currentChunk });
             }
         }
         
@@ -975,7 +970,29 @@ function parseTextContent(text) {
         }
         
         // Se não for Q&A, trata como texto normal mesmo sem múltiplas frases por linha
-        items = lines.map(line => ({ text: line.trim() }));
+        // Agrupa linhas para ter pelo menos 75 caracteres por cartão
+        let processedItems = [];
+        let currentChunk = '';
+        
+        for (const line of lines) {
+            const trimmedLine = line.trim();
+            
+            if (currentChunk.length + trimmedLine.length < 75) {
+                currentChunk = currentChunk ? currentChunk + ' ' + trimmedLine : trimmedLine;
+            } else {
+                if (currentChunk) {
+                    processedItems.push({ text: currentChunk });
+                }
+                currentChunk = trimmedLine;
+            }
+        }
+        
+        // Adiciona o último chunk se houver
+        if (currentChunk) {
+            processedItems.push({ text: currentChunk });
+        }
+        
+        items = processedItems;
     }
     
     originalItems = [...items];
