@@ -930,45 +930,38 @@ function checkAlternatingLinesFormat(text) {
             }
 
 function parseTextContent(text) {
-    // 1. Normaliza o texto (remove quebras de linha múltiplas e espaços extras)
-    const normalizedText = text.replace(/(\r\n|\n|\r)+/g, ' ').replace(/\s+/g, ' ').trim();
-    
-    // 2. Divide em frases completas (incluindo a pontuação)
-    const sentenceRegex = /([^.!?…]+[.!?…]+)\s*/g;
-    const sentences = [];
-    let match;
-    
-    while ((match = sentenceRegex.exec(normalizedText)) !== null) {
-        sentences.push(match[1].trim());
-    }
-    
-    // 3. Se não encontrou frases (texto sem pontuação), usa o texto inteiro
-    if (sentences.length === 0) {
-        items = [{ text: normalizedText }];
-        originalItems = [...items];
-        isQAMode = false;
-        saveState();
-        return;
-    }
-    
-    // 4. Agrupa frases em cartões
+    // 1. Processamento inicial do texto
+    const cleanedText = text.replace(/\r\n/g, '\n')  // Normaliza quebras de linha
+                          .replace(/\n+/g, ' ')     // Substitui múltiplas quebras por espaço
+                          .replace(/\s+/g, ' ')     // Remove espaços múltiplos
+                          .trim();                 // Remove espaços no início/fim
+
+    // 2. Divisão em frases COMPLETAS (incluindo pontuação)
+    const sentences = cleanedText.split(/([^.!?…]*[.!?…]+)/g)
+                               .filter(s => s.trim().length > 0);
+
+    // 3. Agrupamento inteligente em cartões
     const cards = [];
     let currentCard = '';
     
-    for (let i = 0; i < sentences.length; i++) {
-        const sentence = sentences[i];
+    for (const sentence of sentences) {
         const potentialCard = currentCard ? `${currentCard} ${sentence}` : sentence;
         
-        // Se atingiu o tamanho mínimo OU é a última frase
-        if (potentialCard.length >= 75 || i === sentences.length - 1) {
+        // Sempre adiciona a frase atual, mesmo que não atinja 75 caracteres
+        if (potentialCard.length >= 75 || sentence === sentences[sentences.length-1]) {
             cards.push(potentialCard);
             currentCard = '';
         } else {
             currentCard = potentialCard;
         }
     }
-    
-    // 5. Prepara os itens finais
+
+    // 4. Garante que nenhum conteúdo seja perdido
+    if (currentCard.length > 0) {
+        cards.push(currentCard);
+    }
+
+    // 5. Configuração final
     items = cards.map(text => ({ text }));
     originalItems = [...items];
     currentIndex = 0;
