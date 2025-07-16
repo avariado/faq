@@ -934,12 +934,14 @@ function parseTextContent(text) {
     const lines = text.split(/\r?\n/);
     let fullText = lines.map(line => line.trim()).join(' ');
     
-    // Agora divide em frases mantendo os delimitadores
+    // Divide em frases mantendo os delimitadores
     const sentenceRegex = /[^.!?…]*[.!?…]+/g;
     let sentences = [];
     let match;
     while ((match = sentenceRegex.exec(fullText)) !== null) {
-        sentences.push(match[0].trim());
+        if (match[0].trim().length > 0) {
+            sentences.push(match[0].trim());
+        }
     }
     
     let processedItems = [];
@@ -958,23 +960,17 @@ function parseTextContent(text) {
             continue;
         }
         
-        // Se adicionando a próxima frase ainda fica abaixo de 75, acumula
-        const potentialChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
-        if (potentialChunk.length < 75 && i < sentences.length - 1) {
-            currentChunk = potentialChunk;
-            continue;
-        }
+        // Adiciona a frase ao chunk atual
+        currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
         
-        // Caso contrário, adiciona o chunk atual e começa um novo
-        if (currentChunk) {
-            processedItems.push({ text: potentialChunk });
+        // Se o chunk atual atingiu o tamanho mínimo ou é a última frase
+        if (currentChunk.length >= 75 || i === sentences.length - 1) {
+            processedItems.push({ text: currentChunk });
             currentChunk = '';
-        } else {
-            processedItems.push({ text: sentence });
         }
     }
     
-    // Adiciona qualquer chunk restante
+    // Adiciona qualquer chunk restante que possa ter ficado
     if (currentChunk) {
         processedItems.push({ text: currentChunk });
     }
