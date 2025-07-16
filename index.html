@@ -929,13 +929,21 @@
             }
 
             function parseTextContent(text) {
-                let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
+                // Substitui quebras de linha no meio de frases por espaços
+                let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?…])/g, ' ');
                 cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
                 
-                // Regex melhorada para detectar frases
-                const sentenceRegex = /[^.!?]+[.!?…]+(\s|$)/g;
-                let sentences = cleanedText.match(sentenceRegex) || [];
-                sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
+                // Regex melhorada para capturar frases, incluindo a última mesmo sem pontuação
+                const sentenceRegex = /[^.!?…]*[^.!?…\s](?:[.!?…]+|$)/g;
+                let sentences = [];
+                let match;
+                
+                // Usando exec para capturar todas as ocorrências, incluindo a última
+                while ((match = sentenceRegex.exec(cleanedText)) !== null) {
+                    if (match[0].trim()) {
+                        sentences.push(match[0].trim());
+                    }
+                }
                 
                 let processedItems = [];
                 let currentChunk = '';
@@ -943,14 +951,12 @@
                 for (let i = 0; i < sentences.length; i++) {
                     const sentence = sentences[i];
                     
-                    // Se a frase atual é muito curta e não é a última, agrupa com a próxima
-                    if ((currentChunk.length + sentence.length < 75) && (i < sentences.length - 1)) {
+                    if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
                         currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
                     } else {
-                        // Adiciona o chunk atual (se houver) mais a frase atual
                         if (currentChunk) {
                             processedItems.push({
-                                text: currentChunk + ' ' + sentence
+                                text: currentChunk + (sentence ? ' ' + sentence : '')
                             });
                             currentChunk = '';
                         } else {
@@ -959,10 +965,9 @@
                     }
                 }
                 
-                // Garante que nenhuma frase foi perdida
+                // Garante que o último chunk não foi perdido
                 if (currentChunk) {
                     if (processedItems.length > 0) {
-                        // Adiciona ao último item se já existirem itens
                         processedItems[processedItems.length - 1].text += ' ' + currentChunk;
                     } else {
                         processedItems.push({ text: currentChunk });
