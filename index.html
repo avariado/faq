@@ -932,54 +932,69 @@ function isQAContent(text) {
 }
 
 function parseTextContent(text) {
-    // Primeiro, limpa o texto mantendo quebras de linha significativas
-    let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?…])/g, ' ');
-    cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
+    // 1. Normalização do texto - preserva quebras de linha significativas
+    let normalizedText = text.replace(/(\r\n|\n|\r)/g, '\n').replace(/\s+/g, ' ').trim();
     
-    // Divide em frases usando pontos finais, exclamação, interrogação ou três pontos
-    const sentenceRegex = /[^.!?…]+[.!?…]+/g;
-    let sentences = cleanedText.match(sentenceRegex) || [];
-    sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
+    // 2. Divisão em frases usando pontos finais, exclamação, interrogação ou três pontos
+    // Regex avançada que captura o delimitador e trata casos especiais
+    const sentenceRegex = /([^.!?…]*[.!?…]+)\s*/g;
+    let sentences = [];
+    let match;
     
+    while ((match = sentenceRegex.exec(normalizedText)) !== null) {
+        if (match[1].trim().length > 0) {
+            sentences.push(match[1].trim());
+        }
+    }
+    
+    // Caso não encontre frases delimitadas (texto sem pontuação)
+    if (sentences.length === 0) {
+        sentences = [normalizedText];
+    }
+    
+    // 3. Agrupamento inteligente mantendo mínimo de 75 caracteres
     let processedItems = [];
     let currentChunk = '';
     
     for (let i = 0; i < sentences.length; i++) {
         const sentence = sentences[i];
         
-        // Se for a primeira frase do chunk
         if (currentChunk === '') {
             currentChunk = sentence;
-        } 
-        // Se adicionando esta frase não ultrapassar 75 chars E não for a última frase
-        else if ((currentChunk.length + sentence.length + 1) < 75 && i < sentences.length - 1) {
-            currentChunk += ' ' + sentence;
-        }
-        // Se já tiver 75 chars ou for a última frase
-        else {
-            // Se o chunk atual já tem pelo menos 75 chars OU é a última frase
-            if (currentChunk.length >= 75 || i === sentences.length - 1) {
-                processedItems.push({ text: currentChunk + (i === sentences.length - 1 ? ' ' + sentence : '') });
-                currentChunk = '';
-            } 
-            // Se não atingiu 75 chars mas a próxima frase ultrapassaria
-            else {
+        } else {
+            const potentialChunk = currentChunk + ' ' + sentence;
+            
+            if (potentialChunk.length < 75 && i < sentences.length - 1) {
+                currentChunk = potentialChunk;
+            } else {
                 processedItems.push({ text: currentChunk });
                 currentChunk = sentence;
             }
         }
     }
     
-    // Garante que qualquer conteúdo restante seja adicionado
+    // Adiciona o último chunk se houver
     if (currentChunk) {
-        if (processedItems.length > 0) {
+        if (processedItems.length > 0 && (processedItems[processedItems.length - 1].text.length + currentChunk.length) < 150) {
+            // Junta ao último item se não ficar muito grande
             processedItems[processedItems.length - 1].text += ' ' + currentChunk;
         } else {
             processedItems.push({ text: currentChunk });
         }
     }
     
-    items = processedItems;
+    // 4. Verificação final para garantir que nenhum conteúdo foi perdido
+    const originalContent = sentences.join(' ');
+    const processedContent = processedItems.map(item => item.text).join(' ');
+    
+    if (originalContent !== processedContent) {
+        console.warn("Atenção: Conteúdo original e processado diferem!");
+        // Fallback seguro - usa o texto original em um único cartão
+        items = [{ text: originalContent }];
+    } else {
+        items = processedItems;
+    }
+    
     originalItems = [...items];
     currentIndex = 0;
     isQAMode = false;
