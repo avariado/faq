@@ -819,14 +819,11 @@
                 // Determinar o separador usado no conteúdo editado
                 const hasTabs = text.includes('\t');
                 const hasDoubleSemicolon = text.includes(';;');
-                const isAlternatingLines = checkAlternatingLinesFormat(text);
                 
                 if (hasTabs || hasDoubleSemicolon) {
                     // Atualizar o separador original para o usado no editor
                     originalSeparator = hasDoubleSemicolon ? ';;' : '\t';
                     parseQAContent(text);
-                } else if (isAlternatingLines) {
-                    parseAlternatingLinesContent(text);
                 } else {
                     parseTextContent(text);
                 }
@@ -839,16 +836,19 @@
             function checkAlternatingLinesFormat(text) {
                 const lines = text.split('\n').filter(line => line.trim() !== '');
                 
-                // Verifica se alguma linha tem múltiplas frases (separadas por .!?...)
-                for (const line of lines) {
-                    const trimmedLine = line.trim();
-                    // Verifica se há pelo menos um ponto final seguido de outra frase
-                    if ((trimmedLine.match(/[.!?…]+/g) || []).length > 1) {
-                        return false;
-                    }
+                // Verifica se alguma linha contém múltiplas frases (terminadas com .!?…)
+                const hasMultiSentenceLines = lines.some(line => {
+                    // Remove abreviaturas com pontos para evitar falsos positivos
+                    const cleanedLine = line.replace(/\b([A-Za-z]\.){2,}/g, '');
+                    return (cleanedLine.match(/[.!?…]+/g) || []).length > 1;
+                });
+                
+                // Se houver linhas com múltiplas frases, não é formato Q&A
+                if (hasMultiSentenceLines) {
+                    return false;
                 }
                 
-                // Se nenhuma linha tiver múltiplas frases, verifica se o número de linhas é par
+                // Verifica se o número de linhas é par (para Q&A)
                 return lines.length % 2 === 0;
             }
 
@@ -878,14 +878,9 @@
                 const separatorMatch = text.match(/(\s*;;\s*|\t)/);
                 originalSeparator = separatorMatch ? separatorMatch[0] : null;
                 
-                // Se não encontrar nenhum separador válido, verifica se é formato de linhas alternadas
+                // Se não encontrar nenhum separador válido, trata como texto normal
                 if (!originalSeparator) {
-                    const isAlternatingLines = checkAlternatingLinesFormat(text);
-                    if (isAlternatingLines) {
-                        parseAlternatingLinesContent(text);
-                    } else {
-                        parseTextContent(text);
-                    }
+                    parseTextContent(text);
                     return;
                 }
                 
@@ -903,28 +898,6 @@
                         // Se a linha não contiver o separador, trata como texto simples
                         items.push({ text: line.trim() });
                     }
-                }
-                
-                originalItems = [...items];
-                currentIndex = 0;
-                isQAMode = items.length > 0 && items[0].hasOwnProperty('question');
-                saveState();
-            }
-
-            function parseAlternatingLinesContent(text) {
-                const lines = text.split('\n').filter(line => line.trim() !== '');
-                items = [];
-                originalItems = [];
-                
-                for (let i = 0; i < lines.length - 1; i += 2) {
-                    const question = lines[i].trim();
-                    const answer = lines[i + 1].trim();
-                    items.push({ question, answer });
-                }
-                
-                // Adiciona a última linha ímpar como texto se houver
-                if (lines.length % 2 !== 0) {
-                    items.push({ text: lines[lines.length - 1].trim() });
                 }
                 
                 originalItems = [...items];
@@ -1148,15 +1121,12 @@
                             }
                         }
                         
-                        // Agora podemos verificar o formato do conteúdo
+                        // Verifica se há delimitadores de Q&A
                         const hasTabs = contentString.includes('\t');
                         const hasDoubleSemicolon = contentString.includes(';;');
-                        const isAlternatingLines = checkAlternatingLinesFormat(contentString);
                         
                         if (hasTabs || hasDoubleSemicolon) {
                             parseQAContent(contentString);
-                        } else if (isAlternatingLines) {
-                            parseAlternatingLinesContent(contentString);
                         } else {
                             parseTextContent(contentString);
                         }
@@ -1250,35 +1220,13 @@
                     }
             
                     // 4. Detecção do formato (Q&A ou texto normal)
-                    const lines = fullText.split('\n').filter(line => line.trim() !== '');
+                    const hasTabs = fullText.includes('\t');
+                    const hasDoubleSemicolon = fullText.includes(';;');
                     
-                    // Verifica se o texto parece ser perguntas e respostas (linhas alternadas)
-                    let isAlternatingLines = true;
-                    for (let i = 0; i < Math.min(lines.length, 10); i++) {
-                        const line = lines[i].trim();
-                        // Se alguma linha tiver múltiplas frases (mais de um ponto final), não é Q&A
-                        if ((line.match(/[.!?]/g) || []).length > 1) {
-                            isAlternatingLines = false;
-                            break;
-                        }
-                    }
-            
-                    if (isAlternatingLines && lines.length > 1) {
-                        // Verifica se o número de linhas é par para Q&A
-                        if (lines.length % 2 !== 0) {
-                            alert("Aviso: O número de linhas não é par. A última linha será ignorada.");
-                        }
-                        parseAlternatingLinesContent(fullText);
+                    if (hasTabs || hasDoubleSemicolon) {
+                        parseQAContent(fullText);
                     } else {
-                        // Verifica se há separadores de Q&A (tabs ou ;;)
-                        const hasTabs = fullText.includes('\t');
-                        const hasDoubleSemicolon = fullText.includes(';;');
-                        
-                        if (hasTabs || hasDoubleSemicolon) {
-                            parseQAContent(fullText);
-                        } else {
-                            parseTextContent(fullText);
-                        }
+                        parseTextContent(fullText);
                     }
             
                     updateDisplay(); // Atualiza a exibição imediatamente após a importação
