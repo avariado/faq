@@ -936,22 +936,33 @@
             }
 
             function parseTextContent(text) {
-                // Primeiro, normaliza as quebras de linha
-                let cleanedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                // Primeiro, normaliza as quebras de linha mantendo os parágrafos
+                let normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
                 
-                // Divide em frases usando pontuação como delimitador
-                const sentenceRegex = /[^.!?…]+[.!?…]+/g;
+                // Divide o texto em parágrafos (separados por uma ou mais quebras de linha)
+                const paragraphs = normalizedText.split(/\n+/).filter(p => p.trim() !== '');
+                
+                // Processa cada parágrafo separadamente
                 let sentences = [];
-                let match;
                 
-                // Processa cada frase individualmente
-                while ((match = sentenceRegex.exec(cleanedText)) !== null) {
-                    sentences.push(match[0].trim());
-                }
-                
-                // Se não encontrou frases (texto sem pontuação), trata como uma única frase
-                if (sentences.length === 0) {
-                    sentences = [cleanedText.trim()];
+                for (const paragraph of paragraphs) {
+                    // Divide o parágrafo em frases usando pontuação como delimitador
+                    const sentenceRegex = /[^.!?…]*[.!?…]+/g;
+                    let paragraphSentences = [];
+                    let match;
+                    
+                    while ((match = sentenceRegex.exec(paragraph)) !== null) {
+                        if (match[0].trim() !== '') {
+                            paragraphSentences.push(match[0].trim());
+                        }
+                    }
+                    
+                    // Se não encontrou frases (texto sem pontuação), trata como uma única frase
+                    if (paragraphSentences.length === 0 && paragraph.trim() !== '') {
+                        paragraphSentences.push(paragraph.trim());
+                    }
+                    
+                    sentences = sentences.concat(paragraphSentences);
                 }
                 
                 // Cria os itens - cada frase é um item, mesmo que curta
