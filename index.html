@@ -836,22 +836,22 @@
                 saveState();
             }
 
-            function checkAlternatingLinesFormat(text) {
-                const lines = text.split('\n').filter(line => line.trim() !== '');
-                if (lines.length < 2) return false;
-                
-                for (const line of lines) {
-                    const trimmedLine = line.trim();
-                    if (trimmedLine.split('.').length > 2 && !trimmedLine.endsWith('.')) {
-                        return false;
-                    }
-                    if ((trimmedLine.match(/[.!?]/g) || []).length > 1) {
-                        return false;
-                    }
-                }
-                
-                return true;
-            }
+function checkAlternatingLinesFormat(text) {
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    if (lines.length < 2) return false;
+    
+    // Verifica se alguma linha tem múltiplas frases
+    for (const line of lines) {
+        const trimmedLine = line.trim();
+        // Conta o número de frases (terminadas com .!?…)
+        const sentenceCount = (trimmedLine.match(/[.!?…]+(\s|$)/g) || []).length;
+        if (sentenceCount > 1) {
+            return false;
+        }
+    }
+    
+    return true;
+}
 
             function loadSampleData() {
                 const savedState = loadState();
@@ -870,103 +870,115 @@
                 updateFontSize(); 
             }
 
-             function parseQAContent(text) {
-                const lines = text.split('\n');
-                items = [];
-                originalItems = [];
-                
-                // Detectar automaticamente o separador exato (com ou sem espaços)
-                const separatorMatch = text.match(/(\s*;;\s*|\t)/);
-                originalSeparator = separatorMatch ? separatorMatch[0] : null;
-                
-                // Se não encontrar nenhum separador válido
-                if (!originalSeparator) {
-                    parseTextContent(text);
-                    return;
-                }
-                
-                // Processar linhas com o separador detectado
-                for (const line of lines) {
-                    if (line.trim() === '') continue;
-                    
-                    const parts = line.split(originalSeparator);
-                    
-                    if (parts.length >= 2) {
-                        const question = parts[0].trim();
-                        const answer = parts.slice(1).join(originalSeparator).trim();
-                        items.push({ question, answer });
-                    } else {
-                        // Se a linha não contiver o separador, trata como texto simples
-                        items.push({ text: line.trim() });
-                    }
-                }
-                
-                originalItems = [...items];
-                currentIndex = 0;
-                isQAMode = items.length > 0 && items[0].hasOwnProperty('question');
-                saveState();
-            }
+function parseQAContent(text) {
+    const lines = text.split('\n');
+    items = [];
+    originalItems = [];
+    
+    // Detectar automaticamente o separador exato (com ou sem espaços)
+    const separatorMatch = text.match(/(\s*;;\s*|\t)/);
+    originalSeparator = separatorMatch ? separatorMatch[0] : null;
+    
+    // Se não encontrar nenhum separador válido
+    if (!originalSeparator) {
+        parseTextContent(text);
+        return;
+    }
+    
+    // Processar linhas com o separador detectado
+    for (const line of lines) {
+        if (line.trim() === '') continue;
+        
+        const parts = line.split(originalSeparator);
+        
+        if (parts.length >= 2) {
+            const question = parts[0].trim();
+            const answer = parts.slice(1).join(originalSeparator).trim();
+            items.push({ question, answer });
+        } else if (originalSeparator === '\t' || originalSeparator === ';;') {
+            // Se houver delimitador mas a linha não o contém, trata como texto
+            items.push({ text: line.trim() });
+        }
+    }
+    
+    originalItems = [...items];
+    currentIndex = 0;
+    isQAMode = items.length > 0 && items[0].hasOwnProperty('question');
+    saveState();
+}
 
-            function parseAlternatingLinesContent(text) {
-                const lines = text.split('\n').filter(line => line.trim() !== '');
-                items = [];
-                originalItems = [];
-                
-                if (lines.length % 2 !== 0) {
-                    alert("Aviso: O número de linhas não é par. A última linha será ignorada.");
-                }
-                
-                for (let i = 0; i < lines.length - 1; i += 2) {
-                    const question = lines[i].trim();
-                    const answer = lines[i + 1].trim();
-                    items.push({ question, answer });
-                }
-                
-                originalItems = [...items];
-                currentIndex = 0;
-                isQAMode = true;
-                saveState();
-            }
+function parseAlternatingLinesContent(text) {
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    items = [];
+    originalItems = [];
+    
+    // Removido o aviso sobre número ímpar de linhas
+    
+    for (let i = 0; i < lines.length - 1; i += 2) {
+        const question = lines[i].trim();
+        const answer = lines[i + 1].trim();
+        items.push({ question, answer });
+    }
+    
+    // Se houver número ímpar de linhas, adiciona a última como texto
+    if (lines.length % 2 !== 0) {
+        items.push({ text: lines[lines.length - 1].trim() });
+    }
+    
+    originalItems = [...items];
+    currentIndex = 0;
+    isQAMode = items.length > 0 && items[0].hasOwnProperty('question');
+    saveState();
+}
 
-            function parseTextContent(text) {
-                let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
-                cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
-                
-                const sentenceRegex = /[^.!?]+[.!?…]+/g;
-                let sentences = cleanedText.match(sentenceRegex) || [];
-                sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
-                
-                let processedItems = [];
-                let currentChunk = '';
-                
-                for (let i = 0; i < sentences.length; i++) {
-                    const sentence = sentences[i];
-                    
-                    if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
-                        currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
-                        continue;
-                    }
-                    
-                    if (currentChunk || sentence.length >= 75) {
-                        processedItems.push({
-                            text: currentChunk ? currentChunk + ' ' + sentence : sentence
-                        });
-                        currentChunk = '';
-                    } 
-                    else if (i === sentences.length - 1 && processedItems.length > 0) {
-                        processedItems[processedItems.length - 1].text += ' ' + sentence;
-                    }
-                    else {
-                        processedItems.push({ text: sentence });
-                    }
-                }
-                
-                items = processedItems;
-                originalItems = [...items];
-                currentIndex = 0;
-                isQAMode = false;
-                saveState();
+function parseTextContent(text) {
+    // Primeiro, limpa as quebras de linha desnecessárias
+    let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
+    cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
+    
+    // Divide em frases, mantendo os delimitadores
+    const sentenceRegex = /[^.!?…]+[.!?…]+(\s|$)/g;
+    let sentences = cleanedText.match(sentenceRegex) || [];
+    sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
+    
+    let processedItems = [];
+    let currentChunk = '';
+    
+    for (let i = 0; i < sentences.length; i++) {
+        const sentence = sentences[i];
+        
+        // Se o chunk atual + nova frase for menor que 75 ou for a última frase
+        if ((currentChunk.length + sentence.length < 75 && i < sentences.length - 1) || 
+            (currentChunk.length === 0 && sentence.length < 75 && i < sentences.length - 1)) {
+            currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
+        } else {
+            // Adiciona o chunk atual + nova frase ou apenas a nova frase
+            if (currentChunk) {
+                processedItems.push({
+                    text: currentChunk + ' ' + sentence
+                });
+                currentChunk = '';
+            } else {
+                processedItems.push({ text: sentence });
             }
+        }
+    }
+    
+    // Adiciona qualquer chunk restante
+    if (currentChunk) {
+        if (processedItems.length > 0) {
+            processedItems[processedItems.length - 1].text += ' ' + currentChunk;
+        } else {
+            processedItems.push({ text: currentChunk });
+        }
+    }
+    
+    items = processedItems;
+    originalItems = [...items];
+    currentIndex = 0;
+    isQAMode = false;
+    saveState();
+}
 
             function updateDisplay() {
                 if (items.length === 0) {
@@ -1180,118 +1192,108 @@
                 });
             }
             
-            async function processPDFFile(file) {
-                const processingMessage = document.getElementById('processing-message');
-                processingMessage.textContent = "Processando PDF...";
-                processingMessage.style.display = 'block';
+async function processPDFFile(file) {
+    const processingMessage = document.getElementById('processing-message');
+    processingMessage.textContent = "Processando PDF...";
+    processingMessage.style.display = 'block';
+
+    try {
+        // 1. Verificação do cabeçalho do PDF
+        const isPDF = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const arr = new Uint8Array(e.target.result.slice(0, 4));
+                const header = Array.from(arr).map(b => b.toString(16)).join('');
+                resolve(header === '25504446'); // %PDF em hexadecimal
+            };
+            reader.readAsArrayBuffer(file.slice(0, 4));
+        });
+
+        if (!isPDF) {
+            throw new Error("O arquivo não é um PDF válido");
+        }
+
+        // 2. Carregamento do PDF com configurações otimizadas
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({
+            data: arrayBuffer,
+            cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+            cMapPacked: true
+        }).promise;
+
+        // 3. Processamento seguro das páginas
+        let fullText = '';
+        
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
             
-                try {
-                    // 1. Verificação do cabeçalho do PDF
-                    const isPDF = await new Promise((resolve) => {
-                        const reader = new FileReader();
-                        reader.onload = (e) => {
-                            const arr = new Uint8Array(e.target.result.slice(0, 4));
-                            const header = Array.from(arr).map(b => b.toString(16)).join('');
-                            resolve(header === '25504446'); // %PDF em hexadecimal
-                        };
-                        reader.readAsArrayBuffer(file.slice(0, 4));
-                    });
-            
-                    if (!isPDF) {
-                        throw new Error("O arquivo não é um PDF válido");
-                    }
-            
-                    // 2. Carregamento do PDF com configurações otimizadas
-                    const arrayBuffer = await file.arrayBuffer();
-                    const pdf = await pdfjsLib.getDocument({
-                        data: arrayBuffer,
-                        cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
-                        cMapPacked: true
-                    }).promise;
-            
-                    // 3. Processamento seguro das páginas
-                    let fullText = '';
-                    
-                    for (let i = 1; i <= pdf.numPages; i++) {
-                        const page = await pdf.getPage(i);
-                        const textContent = await page.getTextContent();
-                        
-                        // Processamento seguro dos itens de texto
-                        const pageText = textContent.items
-                            .map(item => {
-                                // Verificação segura da propriedade transform
-                                const yPos = item.transform ? item.transform[5] : 0;
-                                return {
-                                    text: item.str,
-                                    yPos: yPos
-                                };
-                            })
-                            // Ordena por posição vertical (Y)
-                            .sort((a, b) => b.yPos - a.yPos)
-                            // Agrupa por linha
-                            .reduce((acc, curr, index, array) => {
-                                if (index === 0 || Math.abs(curr.yPos - array[index-1].yPos) > 5) {
-                                    acc.push([curr]);
-                                } else {
-                                    acc[acc.length-1].push(curr);
-                                }
-                                return acc;
-                            }, [])
-                            // Concatena o texto
-                            .map(line => line.map(item => item.text).join(' '))
-                            .join('\n');
-            
-                        fullText += pageText + '\n\n';
-                    }
-            
-                    // 4. Detecção do formato (Q&A ou texto normal)
-                    const lines = fullText.split('\n').filter(line => line.trim() !== '');
-                    
-                    // Verifica se o texto parece ser perguntas e respostas (linhas alternadas)
-                    let isAlternatingLines = true;
-                    for (let i = 0; i < Math.min(lines.length, 10); i++) {
-                        const line = lines[i].trim();
-                        // Se alguma linha tiver múltiplas frases (mais de um ponto final), não é Q&A
-                        if ((line.match(/[.!?]/g) || []).length > 1) {
-                            isAlternatingLines = false;
-                            break;
-                        }
-                    }
-            
-                    if (isAlternatingLines && lines.length > 1) {
-                        // Verifica se o número de linhas é par para Q&A
-                        if (lines.length % 2 !== 0) {
-                            alert("Aviso: O número de linhas não é par. A última linha será ignorada.");
-                        }
-                        parseAlternatingLinesContent(fullText);
+            const pageText = textContent.items
+                .map(item => {
+                    const yPos = item.transform ? item.transform[5] : 0;
+                    return {
+                        text: item.str,
+                        yPos: yPos
+                    };
+                })
+                .sort((a, b) => b.yPos - a.yPos)
+                .reduce((acc, curr, index, array) => {
+                    if (index === 0 || Math.abs(curr.yPos - array[index-1].yPos) > 5) {
+                        acc.push([curr]);
                     } else {
-                        // Verifica se há separadores de Q&A (tabs ou ;;)
-                        const hasTabs = fullText.includes('\t');
-                        const hasDoubleSemicolon = fullText.includes(';;');
-                        
-                        if (hasTabs || hasDoubleSemicolon) {
-                            parseQAContent(fullText);
-                        } else {
-                            parseTextContent(fullText);
-                        }
+                        acc[acc.length-1].push(curr);
                     }
-            
-                    updateDisplay(); // Atualiza a exibição imediatamente após a importação
-                } catch (error) {
-                    console.error("Erro no processamento:", error);
-                    
-                    // Fallback para processamento como texto simples
-                    if (error.message.includes("Invalid PDF") || error.message.includes("cabeçalho")) {
-                        processingMessage.textContent = "Tentando como arquivo de texto...";
-                        await new Promise(resolve => setTimeout(resolve, 1500));
-                        processTextFile(file);
-                    } else {
-                        alert(`Erro: ${error.message}\nConsulte o console para detalhes.`);
-                    }
-                } finally {
-                    processingMessage.style.display = 'none';
+                    return acc;
+                }, [])
+                .map(line => line.map(item => item.text).join(' '))
+                .join('\n');
+
+            fullText += pageText + '\n\n';
+        }
+
+        // 4. Detecção do formato (Q&A ou texto normal)
+        const lines = fullText.split('\n').filter(line => line.trim() !== '');
+        
+        // Verifica se há separadores de Q&A (tabs ou ;;)
+        const hasTabs = fullText.includes('\t');
+        const hasDoubleSemicolon = fullText.includes(';;');
+        
+        if (hasTabs || hasDoubleSemicolon) {
+            parseQAContent(fullText);
+        } else {
+            // Verifica se é Q&A sem separadores (linhas alternadas)
+            let isAlternatingLines = true;
+            for (const line of lines) {
+                const sentenceCount = (line.match(/[.!?…]+(\s|$)/g) || []).length;
+                if (sentenceCount > 1) {
+                    isAlternatingLines = false;
+                    break;
                 }
             }
+            
+            if (isAlternatingLines && lines.length >= 2) {
+                parseAlternatingLinesContent(fullText);
+            } else {
+                parseTextContent(fullText);
+            }
+        }
+
+        updateDisplay();
+    } catch (error) {
+        console.error("Erro no processamento:", error);
+        
+        // Fallback para processamento como texto simples
+        if (error.message.includes("Invalid PDF") || error.message.includes("cabeçalho")) {
+            processingMessage.textContent = "Tentando como arquivo de texto...";
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            processTextFile(file);
+        } else {
+            alert(`Erro: ${error.message}\nConsulte o console para detalhes.`);
+        }
+    } finally {
+        processingMessage.style.display = 'none';
+    }
+}
             
             function exportFile() {
                 if (items.length === 0) return;
