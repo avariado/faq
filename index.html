@@ -839,25 +839,16 @@
             function checkAlternatingLinesFormat(text) {
                 const lines = text.split('\n').filter(line => line.trim() !== '');
                 
-                // Verifica se alguma linha contém múltiplas frases terminadas com .!? ou ...
+                // Verifica se alguma linha tem múltiplas frases (separadas por .!?...)
                 for (const line of lines) {
-                    // Conta o número de frases na linha (terminadas com .!? ou ...)
-                    const sentenceCount = (line.split(/[.!?…]+/g).length - 1);
-                    if (sentenceCount > 1) {
-                        return false; // Não é formato Q&A se tiver múltiplas frases numa linha
+                    const trimmedLine = line.trim();
+                    // Verifica se há pelo menos um ponto final seguido de outra frase
+                    if ((trimmedLine.match(/[.!?…]+/g) || []).length > 1) {
+                        return false;
                     }
                 }
                 
-                // Verifica se há separadores de Q&A (tabs ou ;;)
-                const hasTabs = text.includes('\t');
-                const hasDoubleSemicolon = text.includes(';;');
-                
-                // Se tiver separadores, é Q&A independentemente do número de linhas
-                if (hasTabs || hasDoubleSemicolon) {
-                    return true;
-                }
-                
-                // Se não tiver separadores, só é Q&A se tiver número par de linhas
+                // Se nenhuma linha tiver múltiplas frases, verifica se o número de linhas é par
                 return lines.length % 2 === 0;
             }
 
@@ -878,7 +869,7 @@
                 updateFontSize(); 
             }
 
-             function parseQAContent(text) {
+            function parseQAContent(text) {
                 const lines = text.split('\n');
                 items = [];
                 originalItems = [];
@@ -887,9 +878,14 @@
                 const separatorMatch = text.match(/(\s*;;\s*|\t)/);
                 originalSeparator = separatorMatch ? separatorMatch[0] : null;
                 
-                // Se não encontrar nenhum separador válido
+                // Se não encontrar nenhum separador válido, verifica se é formato de linhas alternadas
                 if (!originalSeparator) {
-                    parseTextContent(text);
+                    const isAlternatingLines = checkAlternatingLinesFormat(text);
+                    if (isAlternatingLines) {
+                        parseAlternatingLinesContent(text);
+                    } else {
+                        parseTextContent(text);
+                    }
                     return;
                 }
                 
@@ -920,58 +916,53 @@
                 items = [];
                 originalItems = [];
                 
-                if (lines.length % 2 !== 0) {
-                    alert("Aviso: O número de linhas não é par. A última linha será ignorada.");
-                }
-                
                 for (let i = 0; i < lines.length - 1; i += 2) {
                     const question = lines[i].trim();
                     const answer = lines[i + 1].trim();
                     items.push({ question, answer });
                 }
                 
+                // Adiciona a última linha ímpar como texto se houver
+                if (lines.length % 2 !== 0) {
+                    items.push({ text: lines[lines.length - 1].trim() });
+                }
+                
                 originalItems = [...items];
                 currentIndex = 0;
-                isQAMode = true;
+                isQAMode = items.length > 0 && items[0].hasOwnProperty('question');
                 saveState();
             }
 
             function parseTextContent(text) {
-                // Primeiro, preservar todas as quebras de linha originais
-                const paragraphs = text.split(/\n\s*\n/); // Divide por parágrafos vazios
+                let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
+                cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
+                
+                const sentenceRegex = /[^.!?]+[.!?…]+/g;
+                let sentences = cleanedText.match(sentenceRegex) || [];
+                sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
                 
                 let processedItems = [];
+                let currentChunk = '';
                 
-                for (const paragraph of paragraphs) {
-                    // Substituir quebras de linha simples por espaços dentro do mesmo parágrafo
-                    let cleanedParagraph = paragraph.replace(/(\r\n|\n|\r)/g, ' ').replace(/\s+/g, ' ').trim();
+                for (let i = 0; i < sentences.length; i++) {
+                    const sentence = sentences[i];
                     
-                    if (!cleanedParagraph) continue;
-                    
-                    // Dividir em frases, mantendo os delimitadores
-                    const sentenceRegex = /[^.!?]*[.!?…]+/g;
-                    let sentences = cleanedParagraph.match(sentenceRegex) || [];
-                    sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
-                    
-                    let currentChunk = '';
-                    
-                    for (let i = 0; i < sentences.length; i++) {
-                        const sentence = sentences[i];
-                        
-                        // Se o chunk atual + nova frase tiver menos de 75 caracteres e não for a última frase
-                        if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
-                            currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
-                        } else {
-                            // Adiciona o chunk atual + frase atual
-                            const finalText = currentChunk ? currentChunk + ' ' + sentence : sentence;
-                            processedItems.push({ text: finalText });
-                            currentChunk = '';
-                        }
+                    if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
+                        currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
+                        continue;
                     }
                     
-                    // Adiciona qualquer chunk remanescente
-                    if (currentChunk) {
-                        processedItems.push({ text: currentChunk });
+                    if (currentChunk || sentence.length >= 75) {
+                        processedItems.push({
+                            text: currentChunk ? currentChunk + ' ' + sentence : sentence
+                        });
+                        currentChunk = '';
+                    } 
+                    else if (i === sentences.length - 1 && processedItems.length > 0) {
+                        processedItems[processedItems.length - 1].text += ' ' + sentence;
+                    }
+                    else {
+                        processedItems.push({ text: sentence });
                     }
                 }
                 
@@ -1261,31 +1252,33 @@
                     // 4. Detecção do formato (Q&A ou texto normal)
                     const lines = fullText.split('\n').filter(line => line.trim() !== '');
                     
-                    // Verificação se é formato Q&A
+                    // Verifica se o texto parece ser perguntas e respostas (linhas alternadas)
                     let isAlternatingLines = true;
                     for (let i = 0; i < Math.min(lines.length, 10); i++) {
                         const line = lines[i].trim();
-                        // Se alguma linha tiver múltiplas frases (terminadas com .!? ou ...), não é Q&A
-                        const sentenceCount = (line.split(/[.!?…]+/g).length - 1);
-                        if (sentenceCount > 1) {
+                        // Se alguma linha tiver múltiplas frases (mais de um ponto final), não é Q&A
+                        if ((line.match(/[.!?]/g) || []).length > 1) {
                             isAlternatingLines = false;
                             break;
                         }
                     }
             
-                    // Verifica se há separadores de Q&A (tabs ou ;;)
-                    const hasTabs = fullText.includes('\t');
-                    const hasDoubleSemicolon = fullText.includes(';;');
-            
-                    if (hasTabs || hasDoubleSemicolon) {
-                        // Se tiver separadores, trata como Q&A independentemente do número de linhas
-                        parseQAContent(fullText);
-                    } else if (isAlternatingLines && lines.length > 1 && lines.length % 2 === 0) {
-                        // Só trata como Q&A alternado se não tiver múltiplas frases por linha E número par de linhas
+                    if (isAlternatingLines && lines.length > 1) {
+                        // Verifica se o número de linhas é par para Q&A
+                        if (lines.length % 2 !== 0) {
+                            alert("Aviso: O número de linhas não é par. A última linha será ignorada.");
+                        }
                         parseAlternatingLinesContent(fullText);
                     } else {
-                        // Caso contrário, trata como texto normal
-                        parseTextContent(fullText);
+                        // Verifica se há separadores de Q&A (tabs ou ;;)
+                        const hasTabs = fullText.includes('\t');
+                        const hasDoubleSemicolon = fullText.includes(';;');
+                        
+                        if (hasTabs || hasDoubleSemicolon) {
+                            parseQAContent(fullText);
+                        } else {
+                            parseTextContent(fullText);
+                        }
                     }
             
                     updateDisplay(); // Atualiza a exibição imediatamente após a importação
