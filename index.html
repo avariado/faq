@@ -907,24 +907,17 @@ function checkAlternatingLinesFormat(text) {
             }
 
 function parseTextContent(text) {
-    // 1. Normaliza o texto (remove espaços extras e quebras de linha)
-    const normalizedText = text
-        .replace(/(\r\n|\n|\r)/g, ' ')  // Converte quebras de linha em espaços
-        .replace(/\s+/g, ' ')            // Remove múltiplos espaços
-        .trim();                         // Remove espaços no início/fim
-
-    // 2. Divide o texto em frases (usa .!? como delimitadores)
-    const sentences = normalizedText.split(/(?<=[.!?…])\s+/).filter(s => s.trim());
-
-    // 3. Agrupa em cartões de 3 frases cada
-    const processedItems = [];
-    for (let i = 0; i < sentences.length; i += 3) {
-        const chunk = sentences.slice(i, i + 3).join(' ');
-        processedItems.push({ text: chunk });
-    }
-
-    // Atualiza os dados
-    items = processedItems;
+    // 1. Divide o texto em blocos separados por duas ou mais quebras de linha
+    const blocks = text.split(/(?:\r?\n){2,}/);
+    
+    // 2. Processa cada bloco individualmente
+    items = blocks
+        .filter(block => block.trim().length > 0)
+        .map(block => ({
+            text: block.replace(/(\r?\n)+/g, ' ').trim()
+        }));
+    
+    // Configurações finais
     isQAMode = false;
     originalItems = [...items];
     currentIndex = 0;
