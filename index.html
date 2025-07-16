@@ -907,16 +907,19 @@ function checkAlternatingLinesFormat(text) {
             }
 
 function parseTextContent(text) {
-    // 1. Divide o texto em blocos separados por duas ou mais quebras de linha
-    const blocks = text.split(/(?:\r?\n){2,}/);
-    
-    // 2. Processa cada bloco individualmente
-    items = blocks
-        .filter(block => block.trim().length > 0)
-        .map(block => ({
-            text: block.replace(/(\r?\n)+/g, ' ').trim()
-        }));
-    
+    // 1. Normaliza o texto (remove espaços extras e preserva estrutura)
+    const normalizedText = text
+        .replace(/(\r\n|\n|\r)/g, '\n')  // Mantém quebras de linha únicas
+        .replace(/^\s+|\s+$/g, '');       // Remove espaços no início/fim
+
+    // 2. Divide em parágrafos (separados por uma ou mais quebras de linha)
+    const paragraphs = normalizedText.split(/\n+/).filter(p => p.trim().length > 0);
+
+    // 3. Processa cada parágrafo individualmente
+    items = paragraphs.map(paragraph => ({
+        text: paragraph.replace(/\s+/g, ' ').trim()
+    }));
+
     // Configurações finais
     isQAMode = false;
     originalItems = [...items];
