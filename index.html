@@ -907,27 +907,21 @@ function checkAlternatingLinesFormat(text) {
             }
 
 function parseTextContent(text) {
-    // 1. Normaliza o texto (remove espaços extras e quebras de linha)
-    const normalizedText = text
-        .replace(/(\r\n|\n|\r)/g, ' ')  // Substitui quebras de linha por espaços
-        .replace(/\s+/g, ' ')            // Remove múltiplos espaços
-        .trim();                         // Remove espaços no início/fim
+    // 1. Divide o texto em LINHAS (preservando quebras originais)
+    const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
 
-    // 2. Divide em frases COMPLETAS (usando pontuação como delimitador)
-    const sentenceRegex = /[^.!?…]*[.!?…]\s*/g;
-    const sentences = normalizedText.match(sentenceRegex) || [normalizedText];
-    
-    // 3. Agrupa frases até atingir PELO MENOS 75 caracteres
+    // 2. Agrupa linhas até atingir 75+ caracteres
     const processedItems = [];
     let currentChunk = [];
     let currentLength = 0;
 
-    for (const sentence of sentences) {
-        currentChunk.push(sentence.trim());
-        currentLength += sentence.length;
+    for (const line of lines) {
+        const trimmedLine = line.trim();
+        currentChunk.push(trimmedLine);
+        currentLength += trimmedLine.length;
 
-        // Se atingir 75+ caracteres OU for a última frase, cria um cartão
-        if (currentLength >= 75 || sentence === sentences[sentences.length - 1]) {
+        // Se atingir 75+ caracteres OU for a última linha
+        if (currentLength >= 75 || line === lines[lines.length - 1]) {
             if (currentChunk.length > 0) {
                 processedItems.push({
                     text: currentChunk.join(' ')
@@ -938,7 +932,7 @@ function parseTextContent(text) {
         }
     }
 
-    // Atualiza os dados
+    // Configurações finais
     items = processedItems;
     isQAMode = false;
     originalItems = [...items];
