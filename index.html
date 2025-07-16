@@ -836,22 +836,29 @@
                 saveState();
             }
 
-            function checkAlternatingLinesFormat(text) {
-                const lines = text.split('\n').filter(line => line.trim() !== '');
-                if (lines.length < 2) return false;
-                
-                for (const line of lines) {
-                    const trimmedLine = line.trim();
-                    if (trimmedLine.split('.').length > 2 && !trimmedLine.endsWith('.')) {
-                        return false;
-                    }
-                    if ((trimmedLine.match(/[.!?]/g) || []).length > 1) {
-                        return false;
-                    }
-                }
-                
-                return true;
-            }
+function checkAlternatingLinesFormat(text) {
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    
+    // Verifica se alguma linha tem múltiplas frases
+    const hasMultiSentenceLines = lines.some(line => {
+        const trimmedLine = line.trim();
+        // Conta o número de frases (terminadas com .!?…)
+        const sentenceCount = (trimmedLine.match(/[.!?…]+(\s|$)/g) || []).length;
+        return sentenceCount > 1;
+    });
+    
+    // Se houver linhas com múltiplas frases, não é formato Q&A
+    if (hasMultiSentenceLines) return false;
+    
+    // Verifica se tem delimitadores tab ou ;;
+    const hasDelimiters = text.includes('\t') || text.includes(';;');
+    
+    // Se tiver delimitadores, é Q&A independentemente do número de linhas
+    if (hasDelimiters) return true;
+    
+    // Se não tiver delimitadores, só é Q&A se tiver número par de linhas
+    return lines.length % 2 === 0;
+}
 
             function loadSampleData() {
                 const savedState = loadState();
@@ -870,42 +877,36 @@
                 updateFontSize(); 
             }
 
-             function parseQAContent(text) {
-                const lines = text.split('\n');
-                items = [];
-                originalItems = [];
-                
-                // Detectar automaticamente o separador exato (com ou sem espaços)
-                const separatorMatch = text.match(/(\s*;;\s*|\t)/);
-                originalSeparator = separatorMatch ? separatorMatch[0] : null;
-                
-                // Se não encontrar nenhum separador válido
-                if (!originalSeparator) {
-                    parseTextContent(text);
-                    return;
-                }
-                
-                // Processar linhas com o separador detectado
-                for (const line of lines) {
-                    if (line.trim() === '') continue;
-                    
-                    const parts = line.split(originalSeparator);
-                    
-                    if (parts.length >= 2) {
-                        const question = parts[0].trim();
-                        const answer = parts.slice(1).join(originalSeparator).trim();
-                        items.push({ question, answer });
-                    } else {
-                        // Se a linha não contiver o separador, trata como texto simples
-                        items.push({ text: line.trim() });
-                    }
-                }
-                
-                originalItems = [...items];
-                currentIndex = 0;
-                isQAMode = items.length > 0 && items[0].hasOwnProperty('question');
-                saveState();
-            }
+function parseQAContent(text) {
+    const lines = text.split('\n');
+    items = [];
+    originalItems = [];
+    
+    // Detectar automaticamente o separador exato (com ou sem espaços)
+    const separatorMatch = text.match(/(\s*;;\s*|\t)/);
+    originalSeparator = separatorMatch ? separatorMatch[0] : null;
+    
+    // Processar linhas com o separador detectado
+    for (const line of lines) {
+        if (line.trim() === '') continue;
+        
+        const parts = line.split(originalSeparator);
+        
+        if (parts.length >= 2) {
+            const question = parts[0].trim();
+            const answer = parts.slice(1).join(originalSeparator).trim();
+            items.push({ question, answer });
+        } else {
+            // Se a linha não contiver o separador, trata como texto simples
+            items.push({ text: line.trim() });
+        }
+    }
+    
+    originalItems = [...items];
+    currentIndex = 0;
+    isQAMode = items.length > 0 && items[0].hasOwnProperty('question');
+    saveState();
+}
 
             function parseAlternatingLinesContent(text) {
                 const lines = text.split('\n').filter(line => line.trim() !== '');
@@ -928,45 +929,62 @@
                 saveState();
             }
 
-            function parseTextContent(text) {
-                let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
-                cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
-                
-                const sentenceRegex = /[^.!?]+[.!?…]+/g;
-                let sentences = cleanedText.match(sentenceRegex) || [];
-                sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
-                
-                let processedItems = [];
-                let currentChunk = '';
-                
-                for (let i = 0; i < sentences.length; i++) {
-                    const sentence = sentences[i];
-                    
-                    if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
-                        currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
-                        continue;
-                    }
-                    
-                    if (currentChunk || sentence.length >= 75) {
-                        processedItems.push({
-                            text: currentChunk ? currentChunk + ' ' + sentence : sentence
-                        });
-                        currentChunk = '';
-                    } 
-                    else if (i === sentences.length - 1 && processedItems.length > 0) {
-                        processedItems[processedItems.length - 1].text += ' ' + sentence;
-                    }
-                    else {
-                        processedItems.push({ text: sentence });
-                    }
-                }
-                
-                items = processedItems;
-                originalItems = [...items];
-                currentIndex = 0;
-                isQAMode = false;
-                saveState();
-            }
+function parseTextContent(text) {
+    // Primeiro, preservar todas as quebras de linha originais para análise
+    const rawLines = text.split('\n').filter(line => line.trim() !== '');
+    
+    // Verificar se é um ficheiro Q&A (mesmo sem delimitadores)
+    const isQAFile = checkAlternatingLinesFormat(text);
+    
+    if (isQAFile) {
+        // Processar como Q&A
+        parseAlternatingLinesContent(text);
+        return;
+    }
+    
+    // Processar como texto normal
+    let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
+    cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
+    
+    const sentenceRegex = /[^.!?]+[.!?…]+/g;
+    let sentences = cleanedText.match(sentenceRegex) || [];
+    sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
+    
+    let processedItems = [];
+    let currentChunk = '';
+    
+    for (let i = 0; i < sentences.length; i++) {
+        const sentence = sentences[i];
+        
+        // Se for a última frase, adiciona ao chunk atual independentemente do tamanho
+        if (i === sentences.length - 1) {
+            processedItems.push({
+                text: currentChunk ? currentChunk + ' ' + sentence : sentence
+            });
+            break;
+        }
+        
+        // Se adicionar esta frase não ultrapassar 75 caracteres, ou se o chunk estiver vazio
+        if (currentChunk.length + sentence.length < 75 || currentChunk === '') {
+            currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
+        } else {
+            // Se ultrapassar, cria um novo item e reinicia o chunk com a frase atual
+            processedItems.push({ text: currentChunk });
+            currentChunk = sentence;
+        }
+    }
+    
+    // Garantir que nenhum conteúdo é perdido
+    if (currentChunk && !processedItems.some(item => item.text.includes(currentChunk))) {
+        processedItems.push({ text: currentChunk });
+    }
+    
+    items = processedItems;
+    originalItems = [...items];
+    currentIndex = 0;
+    isQAMode = false;
+    saveState();
+}
 
             function updateDisplay() {
                 if (items.length === 0) {
