@@ -929,30 +929,33 @@
             }
 
             function parseTextContent(text) {
-                // Verifica se é ficheiro QA com delimitadores
+                // Primeiro verifica se é QA com delimitadores
                 const hasQADelimiters = text.includes('\t') || text.includes('::');
                 
                 if (!hasQADelimiters) {
-                    // Verifica se alguma linha tem mais de uma frase
+                    // Verifica se é QA de uma frase por linha
                     const lines = text.split(/\r\n|\n|\r/).filter(line => line.trim().length > 0);
-                    let hasMultiSentenceLine = false;
+                    let isQACandidate = true;
                     
                     for (const line of lines) {
-                        // Conta pontuações de fim de frase
-                        const sentenceCount = (line.split(/[.!?…]/).length - 1);
-                        if (sentenceCount > 1) {
-                            hasMultiSentenceLine = true;
+                        // Remove pontuação dentro de números (ex: 1.000)
+                        const cleanLine = line.replace(/\d[.,]\d/g, '');
+                        // Conta quantos terminadores de frase existem
+                        const terminators = (cleanLine.match(/[.!?…]/g) || []).length;
+                        
+                        if (terminators > 1) {
+                            isQACandidate = false;
                             break;
                         }
                     }
                     
-                    // Se encontrou linha com múltiplas frases, processa como texto normal
-                    if (hasMultiSentenceLine) {
+                    if (!isQACandidate) {
+                        // Processa como TEXTO NORMAL
                         processAsNormalText(text);
                         return;
                     }
                     
-                    // Se todas linhas têm 0 ou 1 frase, trata como QA (uma frase por linha)
+                    // Se chegou aqui, é QA de uma frase por linha
                     items = lines.map(line => ({ text: line.trim() }));
                     originalItems = [...items];
                     currentIndex = 0;
@@ -977,13 +980,16 @@
             }
             
             function processAsNormalText(text) {
+                // Junta linhas que não terminam com pontuação
                 let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?…])/g, ' ');
                 cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
                 
+                // Divide em frases
                 const sentenceRegex = /[^.!?…]+[.!?…]+/g;
                 let sentences = cleanedText.match(sentenceRegex) || [];
                 sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
                 
+                // Combina frases curtas
                 let processedItems = [];
                 let currentChunk = '';
                 
