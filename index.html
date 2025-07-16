@@ -929,69 +929,13 @@
             }
 
             function parseTextContent(text) {
-                // 1. Verifica se é QA com delimitadores (tab ou ::)
-                if (text.includes('\t') || text.includes('::')) {
-                    processAsQAWithDelimiters(text);
-                    return;
-                }
-            
-                // 2. Verifica se é texto normal (linhas com múltiplas frases)
-                if (isNormalText(text)) {
-                    processAsNormalText(text);
-                    return;
-                }
-            
-                // 3. Se não for nenhum dos acima, trata como QA de uma frase por linha
-                const lines = text.split(/\r\n|\n|\r/).filter(line => line.trim().length > 0);
-                items = lines.map(line => ({ text: line.trim() }));
-                originalItems = [...items];
-                currentIndex = 0;
-                isQAMode = false;
-                saveState();
-            }
-            
-            function isNormalText(text) {
-                const lines = text.split(/\r\n|\n|\r/);
-                for (const line of lines) {
-                    if (line.trim().length === 0) continue;
-                    
-                    // Conta quantas frases completas existem na linha
-                    const sentenceCount = line.split(/[.!?…]\s+/).length;
-                    
-                    // Se tiver mais de uma frase completa, é texto normal
-                    if (sentenceCount > 1) {
-                        return true;
-                    }
-                }
-                return false;
-            }
-            
-            function processAsQAWithDelimiters(text) {
-                const lines = text.split(/\r\n|\n|\r/).filter(line => line.trim().length > 0);
-                items = lines.map(line => {
-                    const parts = line.split(/\t|::/);
-                    return {
-                        question: parts[0]?.trim() || '',
-                        answer: parts[1]?.trim() || ''
-                    };
-                });
-                originalItems = [...items];
-                currentIndex = 0;
-                isQAMode = true;
-                saveState();
-            }
-            
-            function processAsNormalText(text) {
-                // Junta linhas que não terminam com pontuação
-                let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?…])/g, ' ');
+                let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
                 cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
                 
-                // Divide em frases
-                const sentenceRegex = /[^.!?…]+[.!?…]+/g;
+                const sentenceRegex = /[^.!?]+[.!?…]+/g;
                 let sentences = cleanedText.match(sentenceRegex) || [];
                 sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
                 
-                // Processa as frases
                 let processedItems = [];
                 let currentChunk = '';
                 
@@ -1000,11 +944,20 @@
                     
                     if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
                         currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
-                    } else {
+                        continue;
+                    }
+                    
+                    if (currentChunk || sentence.length >= 75) {
                         processedItems.push({
                             text: currentChunk ? currentChunk + ' ' + sentence : sentence
                         });
                         currentChunk = '';
+                    } 
+                    else if (i === sentences.length - 1 && processedItems.length > 0) {
+                        processedItems[processedItems.length - 1].text += ' ' + sentence;
+                    }
+                    else {
+                        processedItems.push({ text: sentence });
                     }
                 }
                 
@@ -1014,6 +967,7 @@
                 isQAMode = false;
                 saveState();
             }
+
             function updateDisplay() {
                 if (items.length === 0) {
                     questionEl.textContent = "Nenhum conteúdo carregado.";
