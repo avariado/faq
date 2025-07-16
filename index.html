@@ -809,32 +809,31 @@
                 overlay.classList.remove('active');
             }
 
-            function saveContent() {
-                const text = contentEditor.value;
-                if (text.trim() === '') {
-                    alert('O conteúdo não pode estar vazio!');
-                    return;
-                }
-                
-                // Determinar o separador usado no conteúdo editado
-                const hasTabs = text.includes('\t');
-                const hasDoubleSemicolon = text.includes(';;');
-                const isAlternatingLines = checkAlternatingLinesFormat(text);
-                
-                if (hasTabs || hasDoubleSemicolon) {
-                    // Atualizar o separador original para o usado no editor
-                    originalSeparator = hasDoubleSemicolon ? ';;' : '\t';
-                    parseQAContent(text);
-                } else if (isAlternatingLines) {
-                    parseAlternatingLinesContent(text);
-                } else {
-                    parseTextContent(text);
-                }
-                
-                closeEditModal();
-                updateDisplay();
-                saveState();
-            }
+function saveContent() {
+    const text = contentEditor.value;
+    if (text.trim() === '') {
+        alert('O conteúdo não pode estar vazio!');
+        return;
+    }
+    
+    // Determinar o separador usado no conteúdo editado
+    const hasTabs = text.includes('\t');
+    const hasDoubleSemicolon = text.includes(';;');
+    
+    if (hasTabs || hasDoubleSemicolon) {
+        // Atualizar o separador original para o usado no editor
+        originalSeparator = hasDoubleSemicolon ? ';;' : '\t';
+        parseQAContent(text);
+    } else if (isQAContent(text)) {
+        parseQAContent(text);
+    } else {
+        parseTextContent(text);
+    }
+    
+    closeEditModal();
+    updateDisplay();
+    saveState();
+}
 
             function checkAlternatingLinesFormat(text) {
                 const lines = text.split('\n').filter(line => line.trim() !== '');
@@ -907,66 +906,78 @@
                 saveState();
             }
 
-            function parseAlternatingLinesContent(text) {
-                const lines = text.split('\n').filter(line => line.trim() !== '');
-                items = [];
-                originalItems = [];
-                
-                if (lines.length % 2 !== 0) {
-                    alert("Aviso: O número de linhas não é par. A última linha será ignorada.");
-                }
-                
-                for (let i = 0; i < lines.length - 1; i += 2) {
-                    const question = lines[i].trim();
-                    const answer = lines[i + 1].trim();
-                    items.push({ question, answer });
-                }
-                
-                originalItems = [...items];
-                currentIndex = 0;
-                isQAMode = true;
-                saveState();
-            }
+function isQAContent(text) {
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    
+    // Verifica se há linhas com múltiplas frases
+    const hasMultiSentenceLines = lines.some(line => {
+        const trimmedLine = line.trim();
+        // Conta pontos finais, exclamação, interrogação ou três pontos
+        const sentenceDelimiters = trimmedLine.split(/[.!?…]+/).filter(Boolean);
+        return sentenceDelimiters.length > 1;
+    });
+    
+    // Se houver linhas com múltiplas frases, não é Q&A
+    if (hasMultiSentenceLines) return false;
+    
+    // Verifica se tem delimitadores tab ou ;;
+    const hasTabs = text.includes('\t');
+    const hasDoubleSemicolon = text.includes(';;');
+    
+    // Se tiver delimitadores, é Q&A independente do número de linhas
+    if (hasTabs || hasDoubleSemicolon) return true;
+    
+    // Sem delimitadores, só é Q&A se tiver número par de linhas
+    return lines.length % 2 === 0;
+}
 
-            function parseTextContent(text) {
-                let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
-                cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
-                
-                const sentenceRegex = /[^.!?]+[.!?…]+/g;
-                let sentences = cleanedText.match(sentenceRegex) || [];
-                sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
-                
-                let processedItems = [];
-                let currentChunk = '';
-                
-                for (let i = 0; i < sentences.length; i++) {
-                    const sentence = sentences[i];
-                    
-                    if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
-                        currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
-                        continue;
-                    }
-                    
-                    if (currentChunk || sentence.length >= 75) {
-                        processedItems.push({
-                            text: currentChunk ? currentChunk + ' ' + sentence : sentence
-                        });
-                        currentChunk = '';
-                    } 
-                    else if (i === sentences.length - 1 && processedItems.length > 0) {
-                        processedItems[processedItems.length - 1].text += ' ' + sentence;
-                    }
-                    else {
-                        processedItems.push({ text: sentence });
-                    }
-                }
-                
-                items = processedItems;
-                originalItems = [...items];
-                currentIndex = 0;
-                isQAMode = false;
-                saveState();
+function parseTextContent(text) {
+    // Primeiro, limpa o texto mantendo quebras de linha significativas
+    let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?…])/g, ' ');
+    cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
+    
+    // Divide em frases usando pontos finais, exclamação, interrogação ou três pontos
+    const sentenceRegex = /[^.!?…]+[.!?…]+/g;
+    let sentences = cleanedText.match(sentenceRegex) || [];
+    sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
+    
+    let processedItems = [];
+    let currentChunk = '';
+    
+    for (let i = 0; i < sentences.length; i++) {
+        const sentence = sentences[i];
+        
+        // Se o chunk atual + nova frase tiver menos de 75 chars e não for a última frase
+        if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
+            currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
+        } else {
+            // Adiciona o chunk atual + frase atual (ou só a frase se chunk estiver vazio)
+            if (currentChunk) {
+                processedItems.push({ text: currentChunk + ' ' + sentence });
+                currentChunk = '';
+            } else {
+                processedItems.push({ text: sentence });
             }
+        }
+    }
+    
+    // Se sobrou algum chunk no final, adiciona
+    if (currentChunk) {
+        if (processedItems.length > 0) {
+            // Adiciona ao último item se já existirem itens
+            processedItems[processedItems.length - 1].text += ' ' + currentChunk;
+        } else {
+            // Caso raro: texto muito curto
+            processedItems.push({ text: currentChunk });
+        }
+    }
+    
+    items = processedItems;
+    originalItems = [...items];
+    currentIndex = 0;
+    isQAMode = false;
+    saveState();
+}
 
             function updateDisplay() {
                 if (items.length === 0) {
@@ -1122,50 +1133,49 @@
                 e.target.value = '';
             }
 
-            function processTextFile(file) {
-                const reader = new FileReader();
-                
-                reader.onload = function(e) {
-                    try {
-                        // Primeiro tentamos ler como UTF-8
-                        const utf8decoder = new TextDecoder('utf-8');
-                        const data = new Uint8Array(e.target.result);
-                        let contentString = utf8decoder.decode(data);
-                        
-                        // Verifica se há caracteres malformados (como �)
-                        if (contentString.includes('�')) {
-                            // Se encontrou caracteres inválidos, tenta ISO-8859-1
-                            try {
-                                const latin1decoder = new TextDecoder('ISO-8859-1');
-                                contentString = latin1decoder.decode(data);
-                            } catch (e) {
-                                console.warn("Não foi possível decodificar como ISO-8859-1", e);
-                            }
-                        }
-                        
-                        // Agora podemos verificar o formato do conteúdo
-                        const hasTabs = contentString.includes('\t');
-                        const hasDoubleSemicolon = contentString.includes(';;');
-                        const isAlternatingLines = checkAlternatingLinesFormat(contentString);
-                        
-                        if (hasTabs || hasDoubleSemicolon) {
-                            parseQAContent(contentString);
-                        } else if (isAlternatingLines) {
-                            parseAlternatingLinesContent(contentString);
-                        } else {
-                            parseTextContent(contentString);
-                        }
-                        
-                        updateDisplay();
-                    } catch (error) {
-                        alert('Erro ao ler o arquivo: ' + error.message);
-                        console.error(error);
-                    }
-                };
-                
-                // Lê como ArrayBuffer para podermos tentar diferentes codificações
-                reader.readAsArrayBuffer(file);
+function processTextFile(file) {
+    const reader = new FileReader();
+    
+    reader.onload = function(e) {
+        try {
+            // Primeiro tentamos ler como UTF-8
+            const utf8decoder = new TextDecoder('utf-8');
+            const data = new Uint8Array(e.target.result);
+            let contentString = utf8decoder.decode(data);
+            
+            // Verifica se há caracteres malformados (como �)
+            if (contentString.includes('�')) {
+                // Se encontrou caracteres inválidos, tenta ISO-8859-1
+                try {
+                    const latin1decoder = new TextDecoder('ISO-8859-1');
+                    contentString = latin1decoder.decode(data);
+                } catch (e) {
+                    console.warn("Não foi possível decodificar como ISO-8859-1", e);
+                }
             }
+            
+            // Verifica se o conteúdo é Q&A
+            const hasTabs = contentString.includes('\t');
+            const hasDoubleSemicolon = contentString.includes(';;');
+            
+            if (hasTabs || hasDoubleSemicolon) {
+                parseQAContent(contentString);
+            } else if (isQAContent(contentString)) {
+                parseQAContent(contentString);
+            } else {
+                parseTextContent(contentString);
+            }
+            
+            updateDisplay();
+        } catch (error) {
+            alert('Erro ao ler o arquivo: ' + error.message);
+            console.error(error);
+        }
+    };
+    
+    // Lê como ArrayBuffer para podermos tentar diferentes codificações
+    reader.readAsArrayBuffer(file);
+}
 
             async function isFileActuallyPDF(file) {
                 // Verifica os primeiros bytes do arquivo para a assinatura PDF
