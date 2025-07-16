@@ -932,97 +932,73 @@ function parseQAContent(text) {
             }
 
 function parseTextContent(text) {
-    // Primeiro, dividir por quebras de linha mantendo a estrutura original
-    const lines = text.split('\n').filter(line => line.trim() !== '');
+    // 1. Normalizar quebras de linha e espaços
+    let normalizedText = text.replace(/\r\n/g, '\n')  // Windows -> Unix
+                           .replace(/\r/g, '\n')     // Mac -> Unix
+                           .replace(/\n+/g, '\n')    // Múltiplas quebras -> única
+                           .replace(/[ \t]+/g, ' '); // Múltiplos espaços -> único
+
+    // 2. Verificar se é um ficheiro Q&A com delimitadores
+    const hasTabs = text.includes('\t');
+    const hasDoubleSemicolon = text.includes(';;');
     
-    // Verificar se alguma linha contém múltiplas frases
-    let hasMultiSentenceLines = false;
-    for (const line of lines) {
-        const trimmedLine = line.trim();
-        // Contar o número de frases na linha (terminadas com .!?…)
-        const sentenceCount = (trimmedLine.match(/[.!?…]+/g) || []).length;
-        // Se houver mais pontuações finais do que no final da linha, é múltiplas frases
-        if (sentenceCount > 1 && !(sentenceCount === 1 && trimmedLine.match(/[.!?…]+$/))) {
-            hasMultiSentenceLines = true;
-            break;
-        }
+    if (hasTabs || hasDoubleSemicolon) {
+        parseQAContent(text);
+        return;
     }
-    
-    // Se não houver linhas com múltiplas frases, verificar se é Q&A alternado
-    if (!hasMultiSentenceLines && lines.length >= 2 && lines.length % 2 === 0) {
-        // Verificar se parece ser Q&A (linhas alternadas)
-        let isLikelyQA = true;
-        for (let i = 0; i < Math.min(lines.length, 10); i += 2) {
-            const question = lines[i].trim();
-            const answer = lines[i+1].trim();
-            
-            // Se a "pergunta" termina com pontuação ou a "resposta" não termina, provavelmente não é Q&A
-            if (question.match(/[.!?…]$/) || !answer.match(/[.!?…]$/)) {
-                isLikelyQA = false;
-                break;
-            }
-        }
-        
-        if (isLikelyQA) {
-            parseAlternatingLinesContent(text);
-            return;
-        }
-    }
-    
-    // Se chegou aqui, trata como texto normal
-    // Primeiro juntamos todas as linhas preservando quebras onde há múltiplas frases
-    let combinedText = '';
-    for (const line of lines) {
-        const trimmedLine = line.trim();
-        // Se a linha termina com pontuação, é uma frase completa
-        if (trimmedLine.match(/[.!?…]$/)) {
-            combinedText += trimmedLine + ' ';
-        } else {
-            // Se não termina com pontuação, junta com espaço
-            combinedText += trimmedLine + ' ';
-        }
-    }
-    
-    // Agora dividimos em frases
+
+    // 3. Dividir em frases (respeitando pontuação .!?…)
     const sentenceRegex = /[^.!?…]*[.!?…]+/g;
-    let sentences = combinedText.match(sentenceRegex) || [];
-    sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
+    let sentences = [];
+    let match;
     
+    while ((match = sentenceRegex.exec(normalizedText)) !== null) {
+        const sentence = match[0].trim();
+        if (sentence.length > 0) {
+            sentences.push(sentence);
+        }
+    }
+
+    // 4. Se não encontrou frases (texto sem pontuação), tratar como bloco único
+    if (sentences.length === 0) {
+        items = [{ text: normalizedText.trim() }];
+        originalItems = [...items];
+        currentIndex = 0;
+        isQAMode = false;
+        saveState();
+        return;
+    }
+
+    // 5. Agrupar frases mantendo o contexto
     let processedItems = [];
     let currentChunk = '';
     
     for (let i = 0; i < sentences.length; i++) {
         const sentence = sentences[i];
         
-        // Se o chunk atual + nova frase tiver menos de 75 caracteres E não for a última frase
-        if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
-            currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
+        if (currentChunk.length === 0) {
+            // Primeira frase do chunk
+            currentChunk = sentence;
+        } else if (currentChunk.length + sentence.length < 150) {
+            // Adiciona ao chunk atual se não ficar muito grande
+            currentChunk += ' ' + sentence;
         } else {
-            // Se for a última frase ou atingir o tamanho mínimo
-            if (currentChunk) {
-                processedItems.push({
-                    text: currentChunk + ' ' + sentence
-                });
-                currentChunk = '';
-            } else {
-                processedItems.push({
-                    text: sentence
-                });
-            }
-        }
-    }
-    
-    // Garantir que nenhum conteúdo seja perdido
-    if (currentChunk) {
-        if (processedItems.length > 0) {
-            // Adiciona ao último item se já houver itens
-            processedItems[processedItems.length - 1].text += ' ' + currentChunk;
-        } else {
-            // Cria um novo item se não houver nenhum
+            // Chunk atingiu tamanho suficiente, criar novo item
             processedItems.push({ text: currentChunk });
+            currentChunk = sentence;
         }
     }
-    
+
+    // Adicionar o último chunk se houver
+    if (currentChunk.length > 0) {
+        processedItems.push({ text: currentChunk });
+    }
+
+    // 6. Garantir que nenhum conteúdo foi perdido
+    if (processedItems.length === 0 && normalizedText.trim().length > 0) {
+        processedItems.push({ text: normalizedText.trim() });
+    }
+
     items = processedItems;
     originalItems = [...items];
     currentIndex = 0;
