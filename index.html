@@ -929,12 +929,27 @@
             }
 
             function parseTextContent(text) {
-                let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
-                cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
+                // First normalize line breaks and clean up whitespace
+                let cleanedText = text.replace(/\r\n/g, '\n')
+                                     .replace(/\n+/g, '\n')
+                                     .replace(/\s+/g, ' ')
+                                     .trim();
                 
-                const sentenceRegex = /[^.!?]+[.!?…]+/g;
-                let sentences = cleanedText.match(sentenceRegex) || [];
-                sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
+                // Enhanced sentence splitting that handles multiple sentences per line
+                const sentenceRegex = /[^.!?…]*[.!?…]+[\])'"`’”]*\s*/g;
+                let sentences = [];
+                let match;
+                
+                while ((match = sentenceRegex.exec(cleanedText)) !== null) {
+                    if (match[0].trim().length > 0) {
+                        sentences.push(match[0].trim());
+                    }
+                }
+                
+                // If we couldn't split into sentences, treat each line as a separate item
+                if (sentences.length === 0) {
+                    sentences = text.split('\n').filter(line => line.trim().length > 0);
+                }
                 
                 let processedItems = [];
                 let currentChunk = '';
@@ -942,23 +957,30 @@
                 for (let i = 0; i < sentences.length; i++) {
                     const sentence = sentences[i];
                     
-                    if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
-                        currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
+                    // Always add the sentence if it's long enough by itself
+                    if (sentence.length >= 75) {
+                        if (currentChunk) {
+                            processedItems.push({ text: currentChunk });
+                            currentChunk = '';
+                        }
+                        processedItems.push({ text: sentence });
                         continue;
                     }
                     
-                    if (currentChunk || sentence.length >= 75) {
-                        processedItems.push({
-                            text: currentChunk ? currentChunk + ' ' + sentence : sentence
-                        });
-                        currentChunk = '';
+                    // If combining with current chunk would be too long, finalize current chunk
+                    if (currentChunk && (currentChunk.length + sentence.length + 1) >= 75) {
+                        processedItems.push({ text: currentChunk });
+                        currentChunk = sentence;
                     } 
-                    else if (i === sentences.length - 1 && processedItems.length > 0) {
-                        processedItems[processedItems.length - 1].text += ' ' + sentence;
-                    }
+                    // Otherwise add to current chunk
                     else {
-                        processedItems.push({ text: sentence });
+                        currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
                     }
+                }
+                
+                // Add any remaining content
+                if (currentChunk) {
+                    processedItems.push({ text: currentChunk });
                 }
                 
                 items = processedItems;
