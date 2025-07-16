@@ -907,38 +907,23 @@ function checkAlternatingLinesFormat(text) {
             }
 
 function parseTextContent(text) {
-    // 1. Normalizar quebras de linha e remover espaços extras
-    let normalizedText = text
-        .replace(/(\r\n|\n|\r)/g, '\n')  // Substitui todas as quebras de linha por \n
-        .replace(/\s+/g, ' ')            // Remove espaços múltiplos
-        .trim();                         // Remove espaços no início e no fim
+    // 1. Normaliza o texto (remove espaços extras e quebras de linha)
+    const normalizedText = text
+        .replace(/(\r\n|\n|\r)/g, ' ')  // Converte quebras de linha em espaços
+        .replace(/\s+/g, ' ')            // Remove múltiplos espaços
+        .trim();                         // Remove espaços no início/fim
 
-    // 2. Dividir em linhas (preservando frases que já estão separadas)
-    const lines = normalizedText.split('\n').filter(line => line.trim() !== '');
+    // 2. Divide o texto em frases (usa .!? como delimitadores)
+    const sentences = normalizedText.split(/(?<=[.!?…])\s+/).filter(s => s.trim());
 
-    // 3. Juntar linhas em um bloco de texto contínuo
-    const fullText = lines.join(' ');
-
-    // 4. Dividir em frases (usando pontuação como delimitador)
-    const sentenceRegex = /[^.!?…]*[.!?…]+/g;
-    let sentences = fullText.match(sentenceRegex) || [fullText];
-    sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
-
-    // 5. Agrupar em cartões com 3 frases cada (ou menos, se não houver mais)
-    let processedItems = [];
-    let currentChunk = [];
-
-    for (let i = 0; i < sentences.length; i++) {
-        currentChunk.push(sentences[i]);
-
-        // Se tiver 3 frases OU for a última frase, cria um cartão
-        if (currentChunk.length >= 3 || i === sentences.length - 1) {
-            processedItems.push({ text: currentChunk.join(' ') });
-            currentChunk = [];
-        }
+    // 3. Agrupa em cartões de 3 frases cada
+    const processedItems = [];
+    for (let i = 0; i < sentences.length; i += 3) {
+        const chunk = sentences.slice(i, i + 3).join(' ');
+        processedItems.push({ text: chunk });
     }
 
-    // Atualiza as variáveis globais
+    // Atualiza os dados
     items = processedItems;
     isQAMode = false;
     originalItems = [...items];
