@@ -907,76 +907,61 @@ function checkAlternatingLinesFormat(text) {
             }
 
 function parseTextContent(text) {
-    // Primeiro, preservamos as quebras de linha originais para análise
-    const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+    // 1. Normalização do texto - preservar quebras de linha significativas
+    let normalizedText = text.replace(/(\r\n|\n|\r)/g, '\n').replace(/^\s+|\s+$/g, '');
     
-    // Verifica se alguma linha contém múltiplas frases
-    let hasMultiSentenceLines = false;
-    for (const line of lines) {
-        const trimmedLine = line.trim();
-        // Usamos uma regex mais precisa para detectar frases
-        const sentenceCount = (trimmedLine.match(/[.!?…]+/g) || []).length;
-        if (sentenceCount > 1) {
-            hasMultiSentenceLines = true;
-            break;
-        }
-    }
+    // 2. Verificação rigorosa de múltiplas frases por linha
+    const lines = normalizedText.split('\n');
+    let hasMultiSentenceLines = lines.some(line => {
+        const trimmed = line.trim();
+        return (trimmed.match(/[.!?…]/g) || []).length > 1;
+    });
     
-    // Se houver linhas com múltiplas frases OU não houver delimitadores, trata como texto normal
-    const hasTabs = text.includes('\t');
-    const hasDoubleSemicolon = text.includes(';;');
+    // 3. Verificação de delimitadores Q&A
+    const hasQADelimiters = text.includes('\t') || text.includes(';;');
     
-    if (hasMultiSentenceLines || (!hasTabs && !hasDoubleSemicolon)) {
-        // Processa como texto normal, garantindo que nada seja perdido
-        let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
-        cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
+    // 4. Processamento como texto normal (não Q&A)
+    if (!hasQADelimiters || hasMultiSentenceLines) {
+        // Unir linhas mantendo a estrutura de frases
+        let content = lines.join(' ').replace(/\s+/g, ' ').trim();
         
-        // Regex melhorada para divisão de frases
-        const sentenceRegex = /[^.!?…]+[.!?…]+/g;
-        let sentences = cleanedText.match(sentenceRegex) || [];
+        // Divisão inteligente em frases
+        const sentenceRegex = /[^.!?…]*[.!?…]+/g;
+        let sentences = content.match(sentenceRegex) || [content];
         sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
         
-        let processedItems = [];
+        // Agrupamento otimizado mantendo o mínimo de 75 caracteres
+        let items = [];
         let currentChunk = '';
         
-        for (let i = 0; i < sentences.length; i++) {
-            const sentence = sentences[i];
+        for (const sentence of sentences) {
+            const potentialChunk = currentChunk 
+                ? `${currentChunk} ${sentence}` 
+                : sentence;
             
-            if (currentChunk.length === 0) {
-                // Primeira frase do chunk
+            if (potentialChunk.length >= 75 || sentences.length === 1) {
+                if (currentChunk) items.push({ text: currentChunk });
                 currentChunk = sentence;
-            } else if (currentChunk.length + sentence.length + 1 < 75) {
-                // Adiciona ao chunk atual se não ultrapassar 75 caracteres
-                currentChunk += ' ' + sentence;
             } else {
-                // Finaliza o chunk atual e começa um novo
-                if (currentChunk.length > 0) {
-                    processedItems.push({ text: currentChunk });
-                }
-                currentChunk = sentence;
-            }
-            
-            // Adiciona o último chunk se for a última frase
-            if (i === sentences.length - 1 && currentChunk.length > 0) {
-                processedItems.push({ text: currentChunk });
+                currentChunk = potentialChunk;
             }
         }
         
-        // Caso especial quando temos apenas uma frase muito longa
-        if (processedItems.length === 0 && currentChunk.length > 0) {
-            processedItems.push({ text: currentChunk });
-        }
+        // Adicionar o último chunk se existir
+        if (currentChunk) items.push({ text: currentChunk });
         
-        items = processedItems;
-    } else if (hasTabs || hasDoubleSemicolon) {
-        parseQAContent(text);
+        // Caso especial para textos muito curtos
+        if (items.length === 0 && content) items.push({ text: content });
+        
+        this.items = items;
+        this.isQAMode = false;
         return;
     }
     
-    originalItems = [...items];
-    currentIndex = 0;
-    isQAMode = items.length > 0 && items[0].hasOwnProperty('question');
-    saveState();
+    // 5. Processamento como Q&A (apenas se não tiver múltiplas frases e tiver delimitadores)
+    if (hasQADelimiters) {
+        parseQAContent(text);
+    }
 }
 
             function updateDisplay() {
