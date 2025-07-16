@@ -1128,63 +1128,50 @@ function parseTextContent(text) {
                 e.target.value = '';
             }
 
-            function processTextFile(file) {
-                const reader = new FileReader();
-                
-                reader.onload = function(e) {
-                    try {
-                        // Primeiro tentamos ler como UTF-8
-                        const utf8decoder = new TextDecoder('utf-8');
-                        const data = new Uint8Array(e.target.result);
-                        let contentString = utf8decoder.decode(data);
-                        
-                        // Verifica se há caracteres malformados (como �)
-                        if (contentString.includes('�')) {
-                            // Se encontrou caracteres inválidos, tenta ISO-8859-1
-                            try {
-                                const latin1decoder = new TextDecoder('ISO-8859-1');
-                                contentString = latin1decoder.decode(data);
-                            } catch (e) {
-                                console.warn("Não foi possível decodificar como ISO-8859-1", e);
-                            }
-                        }
-                        
-                        // Agora podemos verificar o formato do conteúdo
-                        const hasTabs = contentString.includes('\t');
-                        const hasDoubleSemicolon = contentString.includes(';;');
-                        const isAlternatingLines = checkAlternatingLinesFormat(contentString);
-                        
-                        if (hasTabs || hasDoubleSemicolon) {
-                            parseQAContent(contentString);
-                        } else if (isAlternatingLines) {
-                            parseAlternatingLinesContent(contentString);
-                        } else {
-                            parseTextContent(contentString);
-                        }
-                        
-                        updateDisplay();
-                    } catch (error) {
-                        alert('Erro ao ler o arquivo: ' + error.message);
-                        console.error(error);
-                    }
-                };
-                
-                // Lê como ArrayBuffer para podermos tentar diferentes codificações
-                reader.readAsArrayBuffer(file);
+function processTextFile(file) {
+    const reader = new FileReader();
+    
+    reader.onload = function(e) {
+        try {
+            // Primeiro tentamos ler como UTF-8
+            const utf8decoder = new TextDecoder('utf-8');
+            const data = new Uint8Array(e.target.result);
+            let contentString = utf8decoder.decode(data);
+            
+            // Verifica se há caracteres malformados (como �)
+            if (contentString.includes('�')) {
+                // Se encontrou caracteres inválidos, tenta ISO-8859-1
+                try {
+                    const latin1decoder = new TextDecoder('ISO-8859-1');
+                    contentString = latin1decoder.decode(data);
+                } catch (e) {
+                    console.warn("Não foi possível decodificar como ISO-8859-1", e);
+                }
             }
-
-            async function isFileActuallyPDF(file) {
-                // Verifica os primeiros bytes do arquivo para a assinatura PDF
-                return new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        const arr = new Uint8Array(e.target.result.slice(0, 4));
-                        const header = Array.from(arr).map(b => b.toString(16)).join('');
-                        resolve(header === '25504446'); // %PDF em hexadecimal
-                    };
-                    reader.readAsArrayBuffer(file.slice(0, 4));
-                });
+            
+            // Agora podemos verificar o formato do conteúdo
+            const hasTabs = contentString.includes('\t');
+            const hasDoubleSemicolon = contentString.includes(';;');
+            const isAlternatingLines = isStrictQ&AFormat(contentString);
+            
+            if (hasTabs || hasDoubleSemicolon) {
+                parseQAContent(contentString);
+            } else if (isAlternatingLines) {
+                parseAlternatingLinesContent(contentString);
+            } else {
+                parseTextContent(contentString);
             }
+            
+            updateDisplay();
+        } catch (error) {
+            alert('Erro ao ler o arquivo: ' + error.message);
+            console.error(error);
+        }
+    };
+    
+    // Lê como ArrayBuffer para podermos tentar diferentes codificações
+    reader.readAsArrayBuffer(file);
+}
             
 async function processPDFFile(file) {
     const processingMessage = document.getElementById('processing-message');
