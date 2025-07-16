@@ -907,28 +907,22 @@ function checkAlternatingLinesFormat(text) {
             }
 
 function parseTextContent(text) {
-    // 1. Divide o texto em LINHAS (preservando quebras originais)
+    // 1. Divide o texto em LINHAS preservando a estrutura original
     const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
-
-    // 2. Agrupa linhas até atingir 75+ caracteres
+    
+    // 2. Identifica os grupos naturais de linhas
     const processedItems = [];
-    let currentChunk = [];
-    let currentLength = 0;
-
-    for (const line of lines) {
-        const trimmedLine = line.trim();
-        currentChunk.push(trimmedLine);
-        currentLength += trimmedLine.length;
-
-        // Se atingir 75+ caracteres OU for a última linha
-        if (currentLength >= 75 || line === lines[lines.length - 1]) {
-            if (currentChunk.length > 0) {
-                processedItems.push({
-                    text: currentChunk.join(' ')
-                });
-                currentChunk = [];
-                currentLength = 0;
-            }
+    let currentGroup = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+        currentGroup.push(lines[i].trim());
+        
+        // Detecta quando formar um novo grupo (2 linhas ou fim do texto)
+        if (currentGroup.length === 2 || i === lines.length - 1) {
+            processedItems.push({
+                text: currentGroup.join(' ')
+            });
+            currentGroup = [];
         }
     }
 
