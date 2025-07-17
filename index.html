@@ -376,21 +376,21 @@
 
         .search-buttons {
             display: flex;
-            gap: 15px; /* Aumentado de 5px para 15px */
+            gap: 15px;
             justify-content: center;
             margin-top: 10px;
         }
 
         .search-btn {
-            width: 36px; /* Aumentado de 30px */
-            height: 36px; /* Aumentado de 30px */
+            width: 36px;
+            height: 36px;
             padding: 0;
             background-color: #6200ee;
             color: white;
             border: none;
             border-radius: 50%;
             cursor: pointer;
-            font-size: 16px; /* Aumentado de 14px */
+            font-size: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -557,7 +557,6 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
     <script>
-        // Configuração do PDF.js para evitar problemas com CORS
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
 
         function adjustViewport() {
@@ -621,7 +620,7 @@
             let searchResults = [];
             let currentSearchIndex = -1;
             let isFirstSearchClick = true;
-            let originalSeparator = '\t'; // Padrão inicial, será atualizado durante a importação
+            let originalSeparator = '\t';
 
             loadSampleData();
             updateDisplay();
@@ -786,7 +785,6 @@
                 menu.classList.toggle('active');
                 overlay.classList.toggle('active');
                 
-                // Quando o menu é aberto, rolar para o topo
                 if (menu.classList.contains('active')) {
                     menu.scrollTo(0, 0);
                 }
@@ -795,7 +793,6 @@
             function openEditModal() {
                 toggleMenu();
                 
-                // Usar o separador original com espaços ao exibir no editor
                 contentEditor.value = isQAMode 
                     ? items.map(item => `${item.question}${originalSeparator}${item.answer}`).join('\n')
                     : items.map(item => item.text).join('\n');
@@ -816,13 +813,11 @@
                     return;
                 }
                 
-                // Determinar o separador usado no conteúdo editado
                 const hasTabs = text.includes('\t');
                 const hasDoubleSemicolon = text.includes(';;');
                 const isAlternatingLines = checkAlternatingLinesFormat(text);
                 
                 if (hasTabs || hasDoubleSemicolon) {
-                    // Atualizar o separador original para o usado no editor
                     originalSeparator = hasDoubleSemicolon ? ';;' : '\t';
                     parseQAContent(text);
                 } else if (isAlternatingLines) {
@@ -840,12 +835,15 @@
                 const lines = text.split('\n').filter(line => line.trim() !== '');
                 if (lines.length < 2) return false;
                 
+                // Verifica se todas as linhas têm apenas uma frase
                 for (const line of lines) {
                     const trimmedLine = line.trim();
-                    if (trimmedLine.split('.').length > 2 && !trimmedLine.endsWith('.')) {
+                    // Verifica se há múltiplas frases na mesma linha
+                    if ((trimmedLine.match(/[.!?]/g) || []).length > 1) {
                         return false;
                     }
-                    if ((trimmedLine.match(/[.!?]/g) || []).length > 1) {
+                    // Verifica se há pontuação no meio da linha (não no final)
+                    if (trimmedLine.split(/[.!?]/).some(part => part.trim() !== '' && part !== trimmedLine.split(/[.!?]/).pop())) {
                         return false;
                     }
                 }
@@ -870,7 +868,7 @@
                 updateFontSize(); 
             }
 
-             function parseQAContent(text) {
+            function parseQAContent(text) {
                 const lines = text.split('\n');
                 items = [];
                 originalItems = [];
@@ -912,10 +910,24 @@
                 items = [];
                 originalItems = [];
                 
+                // Verifica se o número de linhas é par (regra 8)
                 if (lines.length % 2 !== 0) {
-                    alert("Aviso: O número de linhas não é par. A última linha será ignorada.");
+                    // Se não for par, trata como texto normal (não mostra alerta conforme regra 8)
+                    parseTextContent(text);
+                    return;
                 }
                 
+                // Verifica se todas as linhas têm apenas uma frase (regra 9)
+                for (const line of lines) {
+                    const trimmedLine = line.trim();
+                    // Se alguma linha tiver múltiplas frases, trata como texto normal (regra 12)
+                    if ((trimmedLine.match(/[.!?]/g) || []).length > 1) {
+                        parseTextContent(text);
+                        return;
+                    }
+                }
+                
+                // Se passou nas verificações, trata como Q&A de pares de linhas
                 for (let i = 0; i < lines.length - 1; i += 2) {
                     const question = lines[i].trim();
                     const answer = lines[i + 1].trim();
@@ -929,13 +941,16 @@
             }
 
             function parseTextContent(text) {
+                // Primeiro trata quebras de linha (regra 16)
                 let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
                 cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
                 
+                // Identifica frases completas (regra 19)
                 const sentenceRegex = /[^.!?]+[.!?…]+/g;
                 let sentences = cleanedText.match(sentenceRegex) || [];
                 sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
                 
+                // Agrupa frases para ter no mínimo 75 caracteres (regra 20)
                 let processedItems = [];
                 let currentChunk = '';
                 
@@ -954,6 +969,7 @@
                         currentChunk = '';
                     } 
                     else if (i === sentences.length - 1 && processedItems.length > 0) {
+                        // Última frase pequena junta à anterior (regra 21)
                         processedItems[processedItems.length - 1].text += ' ' + sentence;
                     }
                     else {
@@ -1098,27 +1114,21 @@
                 const file = e.target.files[0];
                 if (!file) return;
             
-                // Fechar o menu imediatamente
                 toggleMenu();
             
-                // Verificação mais robusta do tipo de arquivo
                 if (file.type === 'application/pdf' || 
                     file.name.toLowerCase().endsWith('.pdf')) {
-                    // Verificação adicional para garantir que é realmente um PDF
                     isFileActuallyPDF(file).then(isPDF => {
                         if (isPDF) {
                             processPDFFile(file);
                         } else {
-                            // Se não for PDF mas tem extensão .pdf, tenta como texto
                             processTextFile(file);
                         }
                     });
                 } else {
-                    // Qualquer outro arquivo tenta processar como texto
                     processTextFile(file);
                 }
             
-                // Limpar o input
                 e.target.value = '';
             }
 
@@ -1127,15 +1137,15 @@
                 
                 reader.onload = function(e) {
                     try {
-                        // Primeiro tentamos ler como UTF-8
+                        // Primeiro tenta UTF-8 (regra 2)
                         const utf8decoder = new TextDecoder('utf-8');
                         const data = new Uint8Array(e.target.result);
                         let contentString = utf8decoder.decode(data);
                         
-                        // Verifica se há caracteres malformados (como �)
+                        // Verifica caracteres inválidos (regra 2)
                         if (contentString.includes('�')) {
-                            // Se encontrou caracteres inválidos, tenta ISO-8859-1
                             try {
+                                // Fallback para ISO-8859-1 (regra 2)
                                 const latin1decoder = new TextDecoder('ISO-8859-1');
                                 contentString = latin1decoder.decode(data);
                             } catch (e) {
@@ -1143,7 +1153,7 @@
                             }
                         }
                         
-                        // Agora podemos verificar o formato do conteúdo
+                        // Verifica o tipo de conteúdo (regras 3-13)
                         const hasTabs = contentString.includes('\t');
                         const hasDoubleSemicolon = contentString.includes(';;');
                         const isAlternatingLines = checkAlternatingLinesFormat(contentString);
@@ -1163,45 +1173,31 @@
                     }
                 };
                 
-                // Lê como ArrayBuffer para podermos tentar diferentes codificações
                 reader.readAsArrayBuffer(file);
             }
 
             async function isFileActuallyPDF(file) {
-                // Verifica os primeiros bytes do arquivo para a assinatura PDF
                 return new Promise((resolve) => {
                     const reader = new FileReader();
                     reader.onload = function(e) {
                         const arr = new Uint8Array(e.target.result.slice(0, 4));
                         const header = Array.from(arr).map(b => b.toString(16)).join('');
-                        resolve(header === '25504446'); // %PDF em hexadecimal
+                        resolve(header === '25504446');
                     };
                     reader.readAsArrayBuffer(file.slice(0, 4));
                 });
             }
             
             async function processPDFFile(file) {
-                const processingMessage = document.getElementById('processing-message');
                 processingMessage.textContent = "Processando PDF...";
                 processingMessage.style.display = 'block';
             
                 try {
-                    // 1. Verificação do cabeçalho do PDF
-                    const isPDF = await new Promise((resolve) => {
-                        const reader = new FileReader();
-                        reader.onload = (e) => {
-                            const arr = new Uint8Array(e.target.result.slice(0, 4));
-                            const header = Array.from(arr).map(b => b.toString(16)).join('');
-                            resolve(header === '25504446'); // %PDF em hexadecimal
-                        };
-                        reader.readAsArrayBuffer(file.slice(0, 4));
-                    });
-            
+                    const isPDF = await isFileActuallyPDF(file);
                     if (!isPDF) {
                         throw new Error("O arquivo não é um PDF válido");
                     }
             
-                    // 2. Carregamento do PDF com configurações otimizadas
                     const arrayBuffer = await file.arrayBuffer();
                     const pdf = await pdfjsLib.getDocument({
                         data: arrayBuffer,
@@ -1209,26 +1205,21 @@
                         cMapPacked: true
                     }).promise;
             
-                    // 3. Processamento seguro das páginas
                     let fullText = '';
                     
                     for (let i = 1; i <= pdf.numPages; i++) {
                         const page = await pdf.getPage(i);
                         const textContent = await page.getTextContent();
                         
-                        // Processamento seguro dos itens de texto
                         const pageText = textContent.items
                             .map(item => {
-                                // Verificação segura da propriedade transform
                                 const yPos = item.transform ? item.transform[5] : 0;
                                 return {
                                     text: item.str,
                                     yPos: yPos
                                 };
                             })
-                            // Ordena por posição vertical (Y)
                             .sort((a, b) => b.yPos - a.yPos)
-                            // Agrupa por linha
                             .reduce((acc, curr, index, array) => {
                                 if (index === 0 || Math.abs(curr.yPos - array[index-1].yPos) > 5) {
                                     acc.push([curr]);
@@ -1237,50 +1228,29 @@
                                 }
                                 return acc;
                             }, [])
-                            // Concatena o texto
                             .map(line => line.map(item => item.text).join(' '))
                             .join('\n');
             
                         fullText += pageText + '\n\n';
                     }
             
-                    // 4. Detecção do formato (Q&A ou texto normal)
-                    const lines = fullText.split('\n').filter(line => line.trim() !== '');
+                    // Aplica as mesmas regras de processamento que para arquivos de texto
+                    const hasTabs = fullText.includes('\t');
+                    const hasDoubleSemicolon = fullText.includes(';;');
+                    const isAlternatingLines = checkAlternatingLinesFormat(fullText);
                     
-                    // Verifica se o texto parece ser perguntas e respostas (linhas alternadas)
-                    let isAlternatingLines = true;
-                    for (let i = 0; i < Math.min(lines.length, 10); i++) {
-                        const line = lines[i].trim();
-                        // Se alguma linha tiver múltiplas frases (mais de um ponto final), não é Q&A
-                        if ((line.match(/[.!?]/g) || []).length > 1) {
-                            isAlternatingLines = false;
-                            break;
-                        }
-                    }
-            
-                    if (isAlternatingLines && lines.length > 1) {
-                        // Verifica se o número de linhas é par para Q&A
-                        if (lines.length % 2 !== 0) {
-                            alert("Aviso: O número de linhas não é par. A última linha será ignorada.");
-                        }
+                    if (hasTabs || hasDoubleSemicolon) {
+                        parseQAContent(fullText);
+                    } else if (isAlternatingLines) {
                         parseAlternatingLinesContent(fullText);
                     } else {
-                        // Verifica se há separadores de Q&A (tabs ou ;;)
-                        const hasTabs = fullText.includes('\t');
-                        const hasDoubleSemicolon = fullText.includes(';;');
-                        
-                        if (hasTabs || hasDoubleSemicolon) {
-                            parseQAContent(fullText);
-                        } else {
-                            parseTextContent(fullText);
-                        }
+                        parseTextContent(fullText);
                     }
             
-                    updateDisplay(); // Atualiza a exibição imediatamente após a importação
+                    updateDisplay();
                 } catch (error) {
                     console.error("Erro no processamento:", error);
                     
-                    // Fallback para processamento como texto simples
                     if (error.message.includes("Invalid PDF") || error.message.includes("cabeçalho")) {
                         processingMessage.textContent = "Tentando como arquivo de texto...";
                         await new Promise(resolve => setTimeout(resolve, 1500));
@@ -1298,7 +1268,6 @@
                 
                 let content;
                 if (isQAMode) {
-                    // Usar o separador original (;; ou tab) ao exportar
                     content = items.map(item => `${item.question}${originalSeparator}${item.answer}`).join('\n');
                 } else {
                     content = items.map(item => item.text).join('\n');
@@ -1307,10 +1276,8 @@
                 const blob = new Blob([content], { type: 'text/plain' });
                 const url = URL.createObjectURL(blob);
                 
-                // Obter o nome do arquivo sugerido
                 let filename = isQAMode ? 'perguntas_respostas.txt' : 'conteudo.txt';
                 
-                // Usar a API File System Access se disponível (Chrome e Edge)
                 if ('showSaveFilePicker' in window) {
                     try {
                         window.showSaveFilePicker({
@@ -1329,17 +1296,14 @@
                         }).catch(err => {
                             if (err.name !== 'AbortError') {
                                 console.error('Erro ao salvar arquivo:', err);
-                                // Fallback para o método tradicional
                                 triggerDownload(url, filename);
                             }
                         });
                     } catch (err) {
                         console.error('Erro ao usar File System Access API:', err);
-                        // Fallback para o método tradicional
                         triggerDownload(url, filename);
                     }
                 } else {
-                    // Fallback para navegadores que não suportam File System Access API
                     triggerDownload(url, filename);
                 }
             }
