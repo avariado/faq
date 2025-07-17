@@ -1228,88 +1228,89 @@
             }
             
             async function processPDFFile(file) {
-                const processingMessage = document.getElementById('processing-message');
                 processingMessage.textContent = "Processando PDF...";
                 processingMessage.style.display = 'block';
             
                 try {
-                    // 1. Verificação inicial do arquivo
-                    const isPDF = await verifyPDFHeader(file);
+                    const isPDF = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            const arr = new Uint8Array(e.target.result.slice(0, 4));
+                            const header = Array.from(arr).map(b => b.toString(16)).join('');
+                            resolve(header === '25504446');
+                        };
+                        reader.readAsArrayBuffer(file.slice(0, 4));
+                    });
+            
                     if (!isPDF) {
                         throw new Error("O arquivo não é um PDF válido");
                     }
             
-                    // 2. Carregamento do PDF
                     const arrayBuffer = await file.arrayBuffer();
                     const pdf = await pdfjsLib.getDocument({
                         data: arrayBuffer,
                         cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
-                        cMapPacked: true,
-                        disableFontFace: true  // Melhora performance e evita problemas com fontes
+                        cMapPacked: true
                     }).promise;
             
                     let fullText = '';
                     
-                    // 3. Processamento página por página
                     for (let i = 1; i <= pdf.numPages; i++) {
                         const page = await pdf.getPage(i);
                         const textContent = await page.getTextContent();
                         
-                        // 4. Extração e limpeza do texto
-                        let pageText = textContent.items
-                            .map(item => item.str)
-                            .join(' ')  // Junção inicial com espaços
-                            .replace(/\s+/g, ' ')  // Normaliza múltiplos espaços
-                            
-                            // Correção universal para palavras divididas
-                            .replace(/([a-zA-ZÀ-ÿ])\s+([a-zA-ZÀ-ÿ])/g, (match, p1, p2) => {
-                                // Verifica se são partes da mesma palavra (exclui casos como "A vista")
-                                return /^[a-zà-ÿ]$/i.test(p1) && /^[a-zà-ÿ]$/i.test(p2) ? p1 + p2 : match;
+                        const pageText = textContent.items
+                            .map(item => {
+                                const yPos = item.transform ? item.transform[5] : 0;
+                                return {
+                                    text: item.str,
+                                    yPos: yPos
+                                };
                             })
-                            
-                            // Correção de pontuação
-                            .replace(/([.,;:!?])\s+/g, '$1 ')  // Espaço único após pontuação
-                            .replace(/([^.])\s+(\.)/g, '$1$2')  // Remove espaço antes do ponto final
-                            .replace(/(\S)\s+([,;:!?])/g, '$1$2')  // Remove espaço antes de pontuação
-                            
-                            // Casos especiais
-                            .replace(/\b\d\s+\.\s+\d\b/g, match => match.replace(/\s+/g, ''))  // Números decimais
-                            .replace(/\b([a-zA-Z])\.\s+([a-zA-Z])\./g, '$1.$2.');  // Abreviações (ex: "A. B.")
+                            .sort((a, b) => b.yPos - a.yPos)
+                            .reduce((acc, curr, index, array) => {
+                                if (index === 0 || Math.abs(curr.yPos - array[index-1].yPos) > 5) {
+                                    acc.push([curr]);
+                                } else {
+                                    acc[acc.length-1].push(curr);
+                                }
+                                return acc;
+                            }, [])
+                            .map(line => line.map(item => item.text).join(' '))
+                            .join('\n');
             
                         fullText += pageText + '\n\n';
                     }
             
-                    // 5. Pós-processamento final
-                    fullText = fullText
-                        .trim()
-                        .replace(/\n{3,}/g, '\n\n')  // Limpa múltiplas quebras de linha
-                        .replace(/^\s+|\s+$/g, '');  // Remove espaços no início/fim
-            
-                    // 6. Determinação do tipo de conteúdo (Q&A ou texto normal)
                     const lines = fullText.split('\n').filter(line => line.trim() !== '');
                     
-                    // Verifica delimitadores primeiro (regra 11)
-                    const hasTabs = fullText.includes('\t');
-                    const hasDoubleSemicolon = fullText.includes(';;');
-                    
-                    if (hasTabs || hasDoubleSemicolon) {
-                        parseQAContent(fullText);
-                    } 
-                    // Verifica linhas alternadas (apenas se não houver delimitadores)
-                    else if (checkAlternatingLinesFormat(fullText)) {
+                    // Verificação do formato (regra 3)
+                    let isAlternatingLines = true;
+                    for (let i = 0; i < Math.min(lines.length, 50); i++) { // Verifica até 50 linhas (regra 4)
+                        const line = lines[i].trim();
+                        if (hasMultipleSentences(line)) {
+                            isAlternatingLines = false;
+                            break;
+                        }
+                    }
+            
+                    if (isAlternatingLines && lines.length > 1 && lines.length % 2 === 0) {
                         parseAlternatingLinesContent(fullText);
-                    } 
-                    // Padrão texto normal
-                    else {
-                        parseTextContent(fullText);
+                    } else {
+                        const hasTabs = fullText.includes('\t');
+                        const hasDoubleSemicolon = fullText.includes(';;');
+                        
+                        if (hasTabs || hasDoubleSemicolon) {
+                            parseQAContent(fullText);
+                        } else {
+                            parseTextContent(fullText);
+                        }
                     }
             
                     updateDisplay();
-                    
                 } catch (error) {
                     console.error("Erro no processamento:", error);
                     
-                    // Fallback para processamento como texto simples
                     if (error.message.includes("Invalid PDF") || error.message.includes("cabeçalho")) {
                         processingMessage.textContent = "Tentando como arquivo de texto...";
                         await new Promise(resolve => setTimeout(resolve, 1500));
@@ -1320,19 +1321,6 @@
                 } finally {
                     processingMessage.style.display = 'none';
                 }
-            }
-            
-            // Função auxiliar para verificar o cabeçalho do PDF
-            async function verifyPDFHeader(file) {
-                return new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        const arr = new Uint8Array(e.target.result.slice(0, 4));
-                        const header = Array.from(arr).map(b => b.toString(16)).join('');
-                        resolve(header === '25504446'); // %PDF em hexadecimal
-                    };
-                    reader.readAsArrayBuffer(file.slice(0, 4));
-                });
             }
             
             function exportFile() {
