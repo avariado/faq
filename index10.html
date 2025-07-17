@@ -1184,104 +1184,137 @@
                 });
             }
             
-            async function processPDFFile(file) {
-                processingMessage.textContent = "Processando PDF...";
-                processingMessage.style.display = 'block';
+async function processPDFFile(file) {
+    processingMessage.textContent = "Processando PDF...";
+    processingMessage.style.display = 'block';
+
+    try {
+        // 1. Verificação inicial do cabeçalho do PDF
+        const isPDF = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const arr = new Uint8Array(e.target.result.slice(0, 4));
+                const header = Array.from(arr).map(b => b.toString(16)).join('');
+                resolve(header === '25504446'); // %PDF em hexadecimal
+            };
+            reader.readAsArrayBuffer(file.slice(0, 4));
+        });
+
+        if (!isPDF) {
+            throw new Error("O arquivo não é um PDF válido");
+        }
+
+        // 2. Carregar o conteúdo do PDF
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({
+            data: arrayBuffer,
+            cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+            cMapPacked: true
+        }).promise;
+
+        let fullText = '';
+        
+        // 3. Extrair texto de todas as páginas
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
             
-                try {
-                    const isPDF = await new Promise((resolve) => {
-                        const reader = new FileReader();
-                        reader.onload = (e) => {
-                            const arr = new Uint8Array(e.target.result.slice(0, 4));
-                            const header = Array.from(arr).map(b => b.toString(16)).join('');
-                            resolve(header === '25504446');
-                        };
-                        reader.readAsArrayBuffer(file.slice(0, 4));
-                    });
-            
-                    if (!isPDF) {
-                        throw new Error("O arquivo não é um PDF válido");
-                    }
-            
-                    const arrayBuffer = await file.arrayBuffer();
-                    const pdf = await pdfjsLib.getDocument({
-                        data: arrayBuffer,
-                        cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
-                        cMapPacked: true
-                    }).promise;
-            
-                    let fullText = '';
-                    
-                    for (let i = 1; i <= pdf.numPages; i++) {
-                        const page = await pdf.getPage(i);
-                        const textContent = await page.getTextContent();
-                        
-                        const pageText = textContent.items
-                            .map(item => {
-                                const yPos = item.transform ? item.transform[5] : 0;
-                                return {
-                                    text: item.str,
-                                    yPos: yPos
-                                };
-                            })
-                            .sort((a, b) => b.yPos - a.yPos)
-                            .reduce((acc, curr, index, array) => {
-                                if (index === 0 || Math.abs(curr.yPos - array[index-1].yPos) > 5) {
-                                    acc.push([curr]);
-                                } else {
-                                    acc[acc.length-1].push(curr);
-                                }
-                                return acc;
-                            }, [])
-                            .map(line => line.map(item => item.text).join(' '))
-                            .join('\n');
-            
-                        fullText += pageText + '\n\n';
-                    }
-            
-                    const lines = fullText.split('\n').filter(line => line.trim() !== '');
-                    
-                    let isAlternatingLines = true;
-                    for (let i = 0; i < Math.min(lines.length, 10); i++) {
-                        const line = lines[i].trim();
-                        if ((line.match(/[.!?]/g) || []).length > 1) {
-                            isAlternatingLines = false;
-                            break;
-                        }
-                    }
-            
-                    if (isAlternatingLines && lines.length > 1) {
-                        if (lines.length % 2 !== 0) {
-                            parseTextContent(fullText);
-                        } else {
-                            parseAlternatingLinesContent(fullText);
-                        }
+            const pageText = textContent.items
+                .map(item => {
+                    const yPos = item.transform ? item.transform[5] : 0;
+                    return {
+                        text: item.str,
+                        yPos: yPos
+                    };
+                })
+                .sort((a, b) => b.yPos - a.yPos)
+                .reduce((acc, curr, index, array) => {
+                    if (index === 0 || Math.abs(curr.yPos - array[index-1].yPos) > 5) {
+                        acc.push([curr]);
                     } else {
-                        const hasTabs = fullText.includes('\t');
-                        const hasDoubleSemicolon = fullText.includes(';;');
-                        
-                        if (hasTabs || hasDoubleSemicolon) {
-                            parseQAContent(fullText);
-                        } else {
-                            parseTextContent(fullText);
-                        }
+                        acc[acc.length-1].push(curr);
                     }
+                    return acc;
+                }, [])
+                .map(line => line.map(item => item.text).join(' '))
+                .join('\n');
+
+            fullText += pageText + '\n\n';
+        }
+
+        // 4. Verificação robusta do formato
+        const lines = fullText.split('\n').filter(line => line.trim() !== '');
+        
+        // Verificação 1: Procurar por delimitadores (regra 12)
+        const hasTabs = fullText.includes('\t');
+        const hasDoubleSemicolon = fullText.includes(';;');
+        
+        if (hasTabs || hasDoubleSemicolon) {
+            parseQAContent(fullText);
+            return;
+        }
+
+        // Verificação 2: Analisar estrutura do texto (regras 13-16)
+        let isLikelyTextNormal = false;
+        const sentenceEndRegex = /[.!?…](?=\s|$)/g;
+        const internalPunctuationRegex = /[.!?…](?![.!?…]*\s*$)/;
+        
+        for (let i = 0; i < Math.min(lines.length, 50); i++) {
+            const line = lines[i].trim();
             
-                    updateDisplay();
-                } catch (error) {
-                    console.error("Erro no processamento:", error);
-                    
-                    if (error.message.includes("Invalid PDF") || error.message.includes("cabeçalho")) {
-                        processingMessage.textContent = "Tentando como arquivo de texto...";
-                        await new Promise(resolve => setTimeout(resolve, 1500));
-                        processTextFile(file);
-                    } else {
-                        alert(`Erro: ${error.message}\nConsulte o console para detalhes.`);
-                    }
-                } finally {
-                    processingMessage.style.display = 'none';
+            // Verifica se há múltiplas frases completas na mesma linha (regra 15)
+            const sentenceEnds = (line.match(sentenceEndRegex) || []).length;
+            if (sentenceEnds > 1) {
+                isLikelyTextNormal = true;
+                break;
+            }
+            
+            // Verifica pontuação no meio da linha (regra 16)
+            if (internalPunctuationRegex.test(line)) {
+                isLikelyTextNormal = true;
+                break;
+            }
+        }
+
+        // Verificação 3: Linhas alternadas só se aplica se não for texto normal (regra 9)
+        if (!isLikelyTextNormal && lines.length > 1 && lines.length % 2 === 0) {
+            // Verificação adicional para linhas alternadas
+            let isValidAlternating = true;
+            const sampleSize = Math.min(lines.length, 20);
+            
+            for (let i = 0; i < sampleSize; i++) {
+                const line = lines[i].trim();
+                const sentenceEnds = (line.match(sentenceEndRegex) || []).length;
+                
+                if (sentenceEnds > 1 || internalPunctuationRegex.test(line)) {
+                    isValidAlternating = false;
+                    break;
                 }
             }
+            
+            if (isValidAlternating) {
+                parseAlternatingLinesContent(fullText);
+                return;
+            }
+        }
+
+        // 5. Se não for identificado como Q&A, trata como texto normal
+        parseTextContent(fullText);
+        
+    } catch (error) {
+        console.error("Erro no processamento:", error);
+        
+        if (error.message.includes("Invalid PDF") || error.message.includes("cabeçalho")) {
+            processingMessage.textContent = "Tentando como arquivo de texto...";
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            processTextFile(file);
+        } else {
+            alert(`Erro: ${error.message}\nConsulte o console para detalhes.`);
+        }
+    } finally {
+        processingMessage.style.display = 'none';
+    }
+}
             
             function exportFile() {
                 if (items.length === 0) return;
