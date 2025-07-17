@@ -920,56 +920,49 @@
                 saveState();
             }
 
-            function parseTextContent(text) {
-                // Substituir quebras de linha por espaços
-                let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
-                cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
-                
-                // Dividir em frases completas
-                const sentenceRegex = /[^.!?…]+[.!?…]+/g;
-                let sentences = cleanedText.match(sentenceRegex) || [];
-                sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
-                
-                // Adicionar frases implícitas (sem pontuação no final)
-                const implicitSentences = cleanedText.split(/[.!?…]+/).filter(s => s.trim().length > 0);
-                for (const s of implicitSentences) {
-                    if (!sentences.some(sentence => sentence.includes(s))) {
-                        sentences.push(s.trim());
-                    }
-                }
-                
-                // Agrupar frases para ter pelo menos 75 caracteres
-                let processedItems = [];
-                let currentChunk = '';
-                
-                for (let i = 0; i < sentences.length; i++) {
-                    const sentence = sentences[i];
-                    
-                    if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
-                        currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
-                        continue;
-                    }
-                    
-                    if (currentChunk || sentence.length >= 75) {
-                        processedItems.push({
-                            text: currentChunk ? currentChunk + ' ' + sentence : sentence
-                        });
-                        currentChunk = '';
-                    } 
-                    else if (i === sentences.length - 1 && processedItems.length > 0) {
-                        processedItems[processedItems.length - 1].text += ' ' + sentence;
-                    }
-                    else {
-                        processedItems.push({ text: sentence });
-                    }
-                }
-                
-                items = processedItems;
-                originalItems = [...items];
-                currentIndex = 0;
-                isQAMode = false;
-                saveState();
-            }
+function parseTextContent(text) {
+    // Substituir quebras de linha por espaços (Regra 17)
+    let cleanedText = text.replace(/(\r\n|\n|\r)(?![.!?,;:])/g, ' ');
+    cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
+
+    // Extrair frases completas (terminadas com .!?…) (Regras 11, 20)
+    const sentenceRegex = /[^.!?…]+[.!?…]+/g;
+    let sentences = cleanedText.match(sentenceRegex) || [];
+    sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
+
+    // Agrupar frases para ter pelo menos 75 caracteres (Regras 21-22)
+    let processedItems = [];
+    let currentChunk = '';
+    
+    for (let i = 0; i < sentences.length; i++) {
+        const sentence = sentences[i];
+        
+        if (currentChunk.length + sentence.length < 75 && i < sentences.length - 1) {
+            currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
+            continue;
+        }
+        
+        if (currentChunk || sentence.length >= 75) {
+            processedItems.push({
+                text: currentChunk ? currentChunk + ' ' + sentence : sentence
+            });
+            currentChunk = '';
+        } 
+        else if (i === sentences.length - 1 && processedItems.length > 0) {
+            // Adiciona à última frase se for pequena (Regra 22)
+            processedItems[processedItems.length - 1].text += ' ' + sentence;
+        }
+        else {
+            processedItems.push({ text: sentence });
+        }
+    }
+    
+    items = processedItems;
+    originalItems = [...items];
+    currentIndex = 0;
+    isQAMode = false;
+    saveState();
+}
 
             function updateDisplay() {
                 if (items.length === 0) {
