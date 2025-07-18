@@ -353,20 +353,28 @@
             display: none;
         }
 
-        #search-menu-item {
-            display: flex;
-            flex-direction: column; /* Organiza ícone e texto em coluna */
-            padding: 15px 10px;
-            border-bottom: 1px solid #eee;
-            cursor: pointer;
-            margin-bottom: 0px; /* Espaço abaixo do texto "Localizar" */
-        }
-        
-        .search-container-wrapper {
-            position: relative;
-            margin-top: 5px;
-            width: 100%;
-        }
+		.search-header {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 8px;
+			width: 100%;
+		}
+
+		#search-menu-item {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			padding: 15px 10px;
+			border-bottom: 1px solid #eee;
+			cursor: pointer;
+			text-align: center;
+		}
+
+		.search-container-wrapper {
+			margin-top: 8px;
+			width: 100%;
+		}
 
         #search-container {
             display: flex;
@@ -527,27 +535,30 @@
             <i>🔄</i> Voltar à Ordem Inicial
         </div>
         <div class="menu-item">
-            <i>🔠</i> Tamanho
-            <div class="font-size-controls">
-                <button id="decrease-font" class="font-size-btn">-</button>
-                <span id="current-font-size">20</span>
-                <button id="increase-font" class="font-size-btn">+</button>
-            </div>
-        </div>
-        <div class="menu-item" id="search-menu-item">
-            <i>🔍</i> Localizar
-            <div class="search-container-wrapper">
-                <div id="search-container">
-                    <input type="text" id="search-input" placeholder="Procurar...">
-                    <div class="search-buttons">
-                        <button id="search-prev-btn" class="search-btn" disabled>◄</button>
-                        <button id="search-next-btn" class="search-btn" disabled>►</button>
-                    </div>
-                    <div class="search-info" id="search-info"></div>
-                </div>
-            </div>
-        </div>
-    </div>
+			<i>🔠</i> Tamanho
+			<div class="font-size-controls">
+				<button id="decrease-font" class="font-size-btn">-</button>
+				<span id="current-font-size">20</span>
+				<button id="increase-font" class="font-size-btn">+</button>
+			</div>
+		</div>
+		<div class="menu-item" id="search-menu-item">
+			<div class="search-header">
+				<span>🔍</span>
+				<span>Localizar</span>
+			</div>
+			<div class="search-container-wrapper">
+				<div id="search-container">
+					<input type="text" id="search-input" placeholder="Procurar...">
+					<div class="search-buttons">
+						<button id="search-prev-btn" class="search-btn" disabled>◄</button>
+						<button id="search-next-btn" class="search-btn" disabled>►</button>
+					</div>
+					<div class="search-info" id="search-info"></div>
+				</div>
+			</div>
+		</div>
+	</div> 
 
     <div id="overlay"></div>
 
