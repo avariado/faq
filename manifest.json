@@ -4,7 +4,6 @@
   "description": "App do meu site GitHub",
   "start_url": "/faq/",
   "display": "standalone",
-  "display_override": ["window-controls-overlay"],
   "scope": "/faq/",
   "background_color": "#000000",
   "theme_color": "#6200ee",
