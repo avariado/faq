@@ -614,6 +614,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleFileImport(e) {
         const file = e.target.files[0];
         if (!file) return;
+
+	if (menu.classList.contains('active')) {
+        toggleMenu();
+        }
         
         if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
             isFileActuallyPDF(file).then(isPDF => {
