@@ -645,7 +645,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             updateDisplay();
-			if (menu.classList.contains('active')) toggleMenu();
+			if (menu.classList.contains('active')) {
+				toggleMenu();
+			}
         } catch (error) {
             alert('Erro ao ler o arquivo: ' + error.message);
             console.error(error);
