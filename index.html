@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt">
+   <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="theme-color" content="#000000">
+      <link rel="manifest" href="/faq/manifest.json">
+      <link rel="icon" href="/faq/icon-192x192.png">
+      <title>Leitor FAQ</title>
+      <link rel="stylesheet" href="/faq/style.css">
+   </head>
+   <body>
+      <header>
+         <button id="menu-btn">☰</button>
+         <h1>Leitor FAQ</h1>
+      </header>
+      <div id="content">
+         <div id="card">
+            <div id="card-content">
+               <div id="question"></div>
+               <div id="answer"></div>
+            </div>
+            <div class="card-footer">
+               <button id="prev-button" class="nav-button">◄</button>
+               <div class="counter-container">
+                  <input type="number" id="current-card-input" min="1">
+                  <span id="total-cards">/ 0</span>
+               </div>
+               <button id="next-button" class="nav-button">►</button>
+            </div>
+         </div>
+      </div>
+      <div id="menu">
+         <div class="menu-item" id="import-file">
+            <i>📁</i> Importar Ficheiro
+         </div>
+         <div class="menu-item" id="export-file">
+            <i>📤</i> Exportar Ficheiro
+         </div>
+         <div class="menu-item" id="edit-content">
+            <i>✏️</i> Editar Conteúdo
+         </div>
+         <div class="menu-item" id="shuffle">
+            <i>🔀</i> Baralhar Perguntas
+         </div>
+         <div class="menu-item" id="reset-order">
+            <i>🔄</i> Voltar à Ordem Inicial
+         </div>
+         <div class="menu-item">
+            <i>🔠</i> Tamanho
+            <div class="font-size-controls">
+               <button id="decrease-font" class="font-size-btn">-</button>
+               <span id="current-font-size">20</span>
+               <button id="increase-font" class="font-size-btn">+</button>
+            </div>
+         </div>
+         <div class="menu-item" id="search-menu-item">
+            <div class="search-header">
+               <span>🔍</span>
+               <span>Localizar</span>
+            </div>
+            <div class="search-container-wrapper">
+               <div id="search-container">
+                  <input type="text" id="search-input" placeholder="Procurar...">
+                  <div class="search-buttons">
+                     <button id="search-prev-btn" class="search-btn" disabled>◄</button>
+                     <button id="search-next-btn" class="search-btn" disabled>►</button>
+                  </div>
+                  <div class="search-info" id="search-info"></div>
+               </div>
+            </div>
+         </div>
+      </div>
+      <div id="overlay"></div>
+      <div id="edit-modal" class="modal">
+         <h2>Editar Conteúdo</h2>
+         <textarea id="content-editor"></textarea>
+         <div class="modal-buttons">
+            <button id="cancel-edit" class="btn btn-secondary">Cancelar</button>
+            <button id="save-edit" class="btn btn-primary">Guardar</button>
+         </div>
+      </div>
+      <input type="file" id="file-input" accept=".txt,.pdf" style="display:none">
+      <a id="file-export" download="perguntas_respostas.txt"></a>
+      <div class="processing-message" id="processing-message">Processando PDF...</div>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+      <script src="/faq/script.js"></script>
+	  <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/faq/sw.js');
+        }
+    </script>
+   </body>
+</html>
